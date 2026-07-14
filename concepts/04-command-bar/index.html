@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Astrus Reprocess · Command Bar</title>
+    <link rel="stylesheet" href="../../assets/shell.css" />
+    <link rel="stylesheet" href="../../assets/cc.css" />
+    <style>
+      /* ==== Command Bar — concept-only styles =============================
+         Paradigm: one calm surface, no wizard. The underwriter composes a
+         plain-English instruction ("Populate [pills] from N documents") by
+         tapping add-chips; selected lines render as removable pills.
+         THE KEY FIX: the pill "slots" strip has a fixed min-height and the
+         Reprocess footer lives OUTSIDE the scrolling content area (a flex
+         column: scrollable body + a non-scrolling footer), so neither
+         adding/removing pills NOR opening the documents expander can ever
+         move the Reprocess button — it is pinned in place, always.
+         ======================================================================= */
+
+      .cbar-followup {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #fef0d9;
+        border: 1px solid #f5d38a;
+        border-left: 4px solid #f59e0b;
+        border-radius: var(--sf-radius);
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #7a4500;
+        margin-bottom: 14px;
+        line-height: 1.4;
+      }
+      .cbar-followup .ic { font-size: 14px; flex: none; }
+      .cbar-followup em { font-style: normal; font-weight: 700; }
+
+      /* fixed-height shell: scroll area on top, footer pinned below it.
+         Growth inside .cbar-scroll (pills wrapping, docs expander opening)
+         is absorbed by its own internal scrollbar and NEVER changes the
+         height/position of .cbar-footer. */
+      .cbar-shell { display: flex; flex-direction: column; }
+      .cbar-scroll {
+        /* FIXED (not max-) height: the scroll area always reserves this exact
+           vertical space. Pills wrapping, add-chips shrinking as lines get
+           picked, and the documents panel opening all happen INSIDE this
+           box (scrolling if needed) — none of it can ever resize the box
+           itself, so .cbar-footer below never moves. This is the fix for
+           the old Smart Panel's "punches the others down" bug. */
+        height: 310px;
+        overflow-y: auto;
+        padding-right: 4px;
+        margin-right: -4px;
+      }
+      /* buttons + hint stack vertically so the buttons always have the full
+         card width to themselves — never squeezed by hint text into wrapping. */
+      .cbar-footer {
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1.5px solid #eef0f2;
+      }
+      .cbar-footer-buttons { display: flex; align-items: center; gap: 10px; }
+      .cbar-reprocess { font-size: 14px; padding: 9px 22px; font-weight: 700; white-space: nowrap; }
+      .cbar-footer-buttons .slds-btn { white-space: nowrap; }
+      .cbar-hint { font-size: 11.5px; color: var(--sf-text-weaker); font-weight: 600; }
+
+      .cbar-card {
+        border: 1px solid var(--sf-border);
+        border-radius: var(--sf-radius-lg);
+        background: #fbfcfe;
+        padding: 14px 14px 12px;
+        margin-bottom: 14px;
+      }
+      .cbar-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+      .cbar-eyebrow { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sf-text-weaker); font-weight: 700; }
+
+      .cbar-sentence { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+      .cbar-word { flex: none; padding-top: 8px; font-size: 15px; font-weight: 700; color: var(--sf-text); }
+      .cbar-word.is-sub { font-weight: 400; color: var(--sf-text-weak); font-size: 13px; padding-top: 0; }
+
+      /* THE stable slots container — fixed min-height regardless of pill count */
+      .cbar-slots {
+        flex: 1 1 auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        gap: 8px;
+        min-height: 72px;
+        padding: 8px 10px;
+        border: 1.5px dashed #dde3ea;
+        border-radius: 10px;
+        background: #fff;
+        transition: border-color 0.12s ease, background 0.12s ease;
+      }
+      .cbar-slots.has-pills { border-style: solid; border-color: #cfe8d8; background: #f7fdf9; }
+      .cbar-placeholder { align-self: center; color: var(--sf-text-weaker); font-style: italic; font-size: 12.5px; }
+
+      .cbar-docswrap { margin-bottom: 12px; }
+      .cbar-docstoggle {
+        border: none; background: #eef4fb; color: var(--sf-brand-dark);
+        font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 6px;
+      }
+      .cbar-docstoggle:hover { background: #dcebfa; }
+      .cbar-docstoggle .car { display: inline-block; transition: transform 0.12s ease; }
+      .cbar-docswrap.is-open .cbar-docstoggle .car { transform: rotate(90deg); }
+      .cbar-docspanel { margin-top: 10px; }
+
+      .cbar-addrow { display: flex; flex-wrap: wrap; gap: 8px; }
+      .cbar-allchip { font-weight: 700; border-color: var(--sf-brand); color: var(--sf-brand-dark); }
+      .cbar-alldone {
+        font-size: 12px; color: #1a7a3a; font-weight: 600; padding: 6px 4px;
+        display: flex; align-items: center; gap: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>This interactive concept needs JavaScript.</noscript>
+    <script src="../../assets/shell.js"></script>
+    <script>
+      (function () {
+        const state = { scope: ASTRUS.newScope(), docsOpen: false };
+        let CTX;
+
+        function statusStrip() {
+          const e = CTX.data.engine;
+          return (
+            '<dl class="cc-status">' +
+            '<dt>Status</dt><dd><span class="slds-badge badge-warning">' + e.status + "</span></dd>" +
+            "<dt>Files</dt><dd>Preprocessed " + e.filesPrep + " · Extracted " + e.filesExt + "</dd>" +
+            "<dt>Completed</dt><dd>" + e.completed + "</dd></dl>"
+          );
+        }
+
+        function countChip() {
+          const n = CTX.selectedCount(state.scope);
+          return '<span class="cc-count' + (n === 0 ? " none" : "") + '">' + n + " of " + CTX.data.lines.length + " lines</span>";
+        }
+
+        function pillHTML(l) {
+          return (
+            '<span class="pill" data-pill="' + l.id + '">' + CTX.esc(l.label) +
+            '<span class="x" data-remove="' + l.id + '" role="button" aria-label="Remove ' + CTX.esc(l.label) + '">✕</span></span>'
+          );
+        }
+
+        function slotsHTML(lines) {
+          if (!lines.length) {
+            return '<span class="cbar-placeholder">Tap a line below to add it here — or grab the entire submission.</span>';
+          }
+          return lines.map(pillHTML).join("");
+        }
+
+        function docsToggleHTML() {
+          const inCount = CTX.includedDocs(state.scope).length;
+          const total = CTX.data.files.length;
+          const open = state.docsOpen;
+          return (
+            '<div class="cbar-docswrap' + (open ? " is-open" : "") + '">' +
+            '<button class="cbar-docstoggle" data-docs-toggle aria-expanded="' + open + '">' +
+            "<span>" + inCount + " of " + total + " documents included</span>" +
+            '<span class="car">▸</span><span>' + (open ? "Hide" : "Review") + "</span></button>" +
+            (open ? '<div class="cbar-docspanel">' + CTX.renderFiles(state.scope) + "</div>" : "") +
+            "</div>"
+          );
+        }
+
+        function addChipsHTML() {
+          if (state.scope.whole) {
+            return (
+              '<div class="cbar-addrow"><span class="cbar-alldone">✓ Entire submission selected — remove a pill above to customize.</span></div>'
+            );
+          }
+          const notSelected = CTX.data.lines.filter((l) => !state.scope.lob.has(l.id));
+          const chips = notSelected.map((l) => '<button class="pill-ghost" data-add="' + l.id + '">+ ' + CTX.esc(l.label) + "</button>").join("");
+          const allChip = '<button class="pill-ghost cbar-allchip" data-add-all>⚡ Entire submission</button>';
+          return '<div class="cbar-addrow">' + chips + allChip + "</div>";
+        }
+
+        function cardHTML() {
+          const lines = CTX.selectedLines(state.scope);
+          return (
+            '<div class="cbar-card">' +
+            '<div class="cbar-card-head"><span class="cbar-eyebrow">Command</span>' + countChip() + "</div>" +
+            '<div class="cbar-sentence"><span class="cbar-word">Populate</span>' +
+            '<div class="cbar-slots' + (lines.length ? " has-pills" : "") + '" id="cbar-slots">' + slotsHTML(lines) + "</div></div>" +
+            docsToggleHTML() +
+            addChipsHTML() +
+            "</div>"
+          );
+        }
+
+        function footerHint() {
+          const total = CTX.data.lines.length;
+          const n = CTX.selectedCount(state.scope);
+          const docs = CTX.includedDocs(state.scope).length;
+          if (!n) return "Pick a line, or the entire submission";
+          return n + " of " + total + " will populate · " + docs + " documents";
+        }
+
+        function render() {
+          const mount = document.getElementById("cc-body");
+          mount.innerHTML =
+            statusStrip() +
+            '<div class="cbar-followup"><span class="ic">📎</span><span>New attachment — <em>' +
+            CTX.esc(CTX.data.followup.file) + "</em> — nothing reprocessed yet.</span></div>" +
+            '<div class="cbar-shell">' +
+            '<div class="cbar-scroll" id="cbar-scroll">' + cardHTML() + "</div>" +
+            '<div class="cbar-footer"><div class="cbar-footer-buttons">' +
+            '<button class="slds-btn slds-btn--brand cbar-reprocess" data-reprocess' +
+            (!CTX.hasSelection(state.scope) ? " disabled" : "") + ">Reprocess</button>" +
+            '<button class="slds-btn" data-processnew>Process as New</button>' +
+            "</div><span class=\"cbar-hint\">" + footerHint() + "</span>" +
+            "</div></div>";
+          bind(mount);
+        }
+
+        function bind(mount) {
+          mount.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => { state.scope.lob.add(b.dataset.add); render(); }));
+          const allBtn = mount.querySelector("[data-add-all]");
+          if (allBtn) allBtn.onclick = () => { state.scope.whole = true; render(); };
+          mount.querySelectorAll("[data-remove]").forEach((b) => (b.onclick = () => {
+            const id = b.dataset.remove;
+            if (state.scope.whole) {
+              state.scope.whole = false;
+              state.scope.lob = new Set(CTX.data.lines.map((l) => l.id));
+              state.scope.lob.delete(id);
+            } else {
+              state.scope.lob.delete(id);
+            }
+            render();
+          }));
+          const dt = mount.querySelector("[data-docs-toggle]");
+          if (dt) dt.onclick = () => { state.docsOpen = !state.docsOpen; render(); };
+          mount.querySelectorAll(".doc-toggle").forEach((b) => (b.onclick = () => {
+            const n = b.dataset.doc;
+            state.scope.excludedDocs.has(n) ? state.scope.excludedDocs.delete(n) : state.scope.excludedDocs.add(n);
+            render();
+          }));
+          const rp = mount.querySelector("[data-reprocess]");
+          if (rp) rp.onclick = async () => {
+            const ok = await CTX.runReprocess(state.scope);
+            if (ok) { state.scope = ASTRUS.newScope(); state.docsOpen = false; render(); }
+          };
+          const pn = mount.querySelector("[data-processnew]");
+          if (pn) pn.onclick = async () => {
+            const ok = await CTX.confirmModal({
+              title: "Process as a new submission?",
+              body: "<p>Ignores your scope and rebuilds everything as a fresh submission.</p>",
+              confirmLabel: "Process as New",
+              destructive: true
+            });
+            if (ok) CTX.toast("success", "Process as New started", "A new submission was sent to the engine.");
+          };
+        }
+
+        window.CONCEPT = { name: "Command Bar", render: function (mount, ctx) { CTX = ctx; render(); } };
+        ASTRUS.boot(window.CONCEPT);
+      })();
+    </script>
+  </body>
+</html>

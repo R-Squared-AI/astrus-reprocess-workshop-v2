@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Astrus Reprocess · Split Board</title>
+    <link rel="stylesheet" href="../../assets/shell.css" />
+    <link rel="stylesheet" href="../../assets/cc.css" />
+    <style>
+      /* Split Board — two-lane scope picker (own styles; shared .board/.lane/.lane-item live in cc.css) */
+      .board-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+
+      .lane-item { position: relative; align-items: flex-start; }
+      .li-label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+      .li-name { line-height: 1.25; }
+      .lane-item .line-sub-tag { white-space: nowrap; align-self: flex-start; }
+      .lane-move { flex: none; padding-top: 1px; }
+      .lane--lock .lane-move { color: var(--sf-brand); }
+      .lane--pop .lane-move { color: #6b7c90; }
+
+      @keyframes lanePopIn {
+        0% { transform: scale(0.92) translateY(-3px); opacity: 0.35; background: #d6f3e0; }
+        60% { background: #d6f3e0; }
+        100% { transform: none; opacity: 1; background: #fff; }
+      }
+      @keyframes laneLockIn {
+        0% { transform: scale(0.92) translateY(-3px); opacity: 0.35; background: #eef0f3; }
+        60% { background: #eef0f3; }
+        100% { transform: none; opacity: 1; background: #fff; }
+      }
+      .lane-item.just-moved--pop { animation: lanePopIn 0.32s ease; }
+      .lane-item.just-moved--lock { animation: laneLockIn 0.32s ease; }
+
+      @media (max-width: 380px) {
+        .board { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>This interactive concept needs JavaScript.</noscript>
+    <script src="../../assets/shell.js"></script>
+    <script>
+      (function () {
+        const state = { moment: 0, scope: ASTRUS.newScope(), lastMoved: null };
+        const _hm = location.hash.match(/m(\d)/);
+        if (_hm) state.moment = Number(_hm[1]);
+        let CTX;
+
+        function statusStrip() {
+          const e = CTX.data.engine;
+          return (
+            '<dl class="cc-status">' +
+            '<dt>Status</dt><dd><span class="slds-badge badge-warning">' + e.status + "</span></dd>" +
+            "<dt>Files</dt><dd>Preprocessed " + e.filesPrep + " · Extracted " + e.filesExt + "</dd>" +
+            "<dt>Completed</dt><dd>" + e.completed + "</dd></dl>"
+          );
+        }
+
+        function countChip() {
+          const n = CTX.selectedCount(state.scope);
+          return '<span class="cc-count' + (n === 0 ? " none" : "") + '">' + n + " of " + CTX.data.lines.length + " will populate</span>";
+        }
+
+        function runSummaryHTML() {
+          const r = CTX.computeRunSummary(state.scope);
+          const empty = !CTX.hasSel();
+          const icon = { docs: "📄", populate: "✓", lock: "🔒", protect: "🔒" };
+          const lines = r.lines.map((l) => '<div class="run-line run-line--' + l.kind + '"><span class="rl-ic">' + (icon[l.kind] || "•") + "</span><span>" + CTX.esc(l.text) + "</span></div>").join("");
+          return '<div class="run-summary' + (empty ? " is-empty" : "") + '">' + (empty ? '<p class="cc-hint" style="margin:0">Move a line to <strong>Will populate</strong> to preview.</p>' : lines) + "</div>";
+        }
+
+        function render() {
+          const mount = document.getElementById("cc-body");
+          mount.innerHTML = statusStrip();
+          mount.appendChild(CTX.momentStepper(state.moment, go));
+          const box = document.createElement("div");
+          if (state.moment === 0) box.innerHTML = mArrival();
+          else if (state.moment === 1) box.innerHTML = mFiles();
+          else if (state.moment === 2) box.innerHTML = mBoard();
+          else box.innerHTML = mRun();
+          mount.appendChild(box);
+          bind(box);
+        }
+
+        function mArrival() {
+          return CTX.bellAlertHTML() + '<div class="cc-actions"><button class="slds-btn slds-btn--brand" data-go="1">Review documents →</button></div>';
+        }
+
+        function mFiles() {
+          return (
+            '<p class="cc-section-title">Documents</p>' +
+            CTX.renderFiles(state.scope) +
+            '<div class="cc-actions"><button class="slds-btn" data-go="0">← Back</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="2">Next: lines →</button></div>'
+          );
+        }
+
+        function subTag(l) {
+          return l.kind === "sub" ? '<span class="line-sub-tag">Submission-level</span>' : "";
+        }
+
+        function popItem(l) {
+          const cls = "lane-item" + (l.kind === "sub" ? " is-sub" : "") + (state.lastMoved === l.id ? " just-moved just-moved--pop" : "");
+          return '<div class="' + cls + '" data-move="' + l.id + '" role="button" tabindex="0"><span class="li-label"><span class="li-name">' + CTX.esc(l.label) + "</span>" + subTag(l) + '</span><span class="lane-move">← lock</span></div>';
+        }
+        function lockItem(l) {
+          const cls = "lane-item" + (l.kind === "sub" ? " is-sub" : "") + (state.lastMoved === l.id ? " just-moved just-moved--lock" : "");
+          return '<div class="' + cls + '" data-move="' + l.id + '" role="button" tabindex="0"><span class="li-label"><span class="li-name">' + CTX.esc(l.label) + "</span>" + subTag(l) + '</span><span class="lane-move">→ populate</span></div>';
+        }
+
+        function mBoard() {
+          const pop = CTX.selectedLines(state.scope);
+          const locked = CTX.lockedLines(state.scope);
+          return (
+            '<div class="cc-title-row"><p class="cc-section-title">Split the lines</p>' + countChip() + "</div>" +
+            '<p class="cc-section-sub">Click a line to move it between lanes. Everything starts locked.</p>' +
+            '<div class="board-actions"><button class="slds-btn slds-btn--brand" data-allpop>Move all → populate</button><button class="slds-btn" data-clear' + (CTX.hasSel() ? "" : " disabled") + ">Clear</button></div>" +
+            '<div class="board">' +
+            '<div class="lane lane--pop"><div class="lane-head">Will populate (' + pop.length + ")</div>" +
+            (pop.length ? pop.map(popItem).join("") : '<div class="lane-empty">Nothing yet — move a line over.</div>') +
+            "</div>" +
+            '<div class="lane lane--lock"><div class="lane-head">Locked (' + locked.length + ")</div>" +
+            (locked.length ? locked.map(lockItem).join("") : '<div class="lane-empty">Everything is populating.</div>') +
+            "</div></div>" +
+            runSummaryHTML() +
+            '<div class="cc-actions"><button class="slds-btn" data-go="1">← Documents</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="3">Review →</button></div>'
+          );
+        }
+
+        function mRun() {
+          return (
+            '<div class="cc-title-row"><p class="cc-section-title">Reprocess</p>' + countChip() + "</div>" +
+            runSummaryHTML() +
+            '<div class="cc-actions"><button class="slds-btn slds-btn--brand" data-reprocess ' + (!CTX.hasSel() ? "disabled" : "") + ">Reprocess</button>" +
+            '<button class="slds-btn" data-processnew>Process as New</button><span class="spacer"></span><button class="slds-btn" data-go="2">← Adjust</button></div>'
+          );
+        }
+
+        function go(i) { state.moment = i; history.replaceState(null, "", "#m" + i); render(); }
+
+        function moveLine(id) {
+          if (state.scope.whole) {
+            state.scope.whole = false;
+            state.scope.lob = new Set(CTX.data.lines.map((l) => l.id));
+            state.scope.lob.delete(id);
+          } else if (state.scope.lob.has(id)) {
+            state.scope.lob.delete(id);
+          } else {
+            state.scope.lob.add(id);
+          }
+          state.lastMoved = id;
+          render();
+        }
+
+        function bind(box) {
+          box.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => go(Number(b.dataset.go))));
+          box.querySelectorAll(".doc-toggle").forEach((b) => (b.onclick = () => { const n = b.dataset.doc; state.scope.excludedDocs.has(n) ? state.scope.excludedDocs.delete(n) : state.scope.excludedDocs.add(n); render(); }));
+          box.querySelectorAll("[data-move]").forEach((el) => {
+            el.onclick = () => moveLine(el.dataset.move);
+            el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); moveLine(el.dataset.move); } };
+          });
+          const allpop = box.querySelector("[data-allpop]");
+          if (allpop) allpop.onclick = () => { state.scope.whole = true; state.lastMoved = null; render(); };
+          const clear = box.querySelector("[data-clear]");
+          if (clear) clear.onclick = () => { state.scope.whole = false; state.scope.lob.clear(); state.lastMoved = null; render(); };
+          const rp = box.querySelector("[data-reprocess]");
+          if (rp) rp.onclick = async () => { const ok = await CTX.runReprocess(state.scope); if (ok) { state.scope = ASTRUS.newScope(); state.lastMoved = null; go(0); } };
+          const pn = box.querySelector("[data-processnew]");
+          if (pn) pn.onclick = async () => { const ok = await CTX.confirmModal({ title: "Process as a new submission?", body: "<p>Ignores your scope and rebuilds everything as a fresh submission.</p>", confirmLabel: "Process as New", destructive: true }); if (ok) CTX.toast("success", "Process as New started", "A new submission was sent to the engine."); };
+        }
+
+        window.CONCEPT = { name: "Split Board", render: function (mount, ctx) { CTX = ctx; CTX.hasSel = () => state.scope.whole || state.scope.lob.size > 0; render(); } };
+        ASTRUS.boot(window.CONCEPT);
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Astrus Reprocess · Coverage Tiles</title>
+    <link rel="stylesheet" href="../../assets/shell.css" />
+    <link rel="stylesheet" href="../../assets/cc.css" />
+    <style>
+      .tile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+      .tile:disabled { cursor: default; }
+      .tile.is-forced { box-shadow: none; }
+    </style>
+  </head>
+  <body>
+    <noscript>This interactive concept needs JavaScript.</noscript>
+    <script src="../../assets/shell.js"></script>
+    <script>
+      (function () {
+        const state = { moment: 0, scope: ASTRUS.newScope() };
+        const _hm = location.hash.match(/m(\d)/);
+        if (_hm) state.moment = Number(_hm[1]);
+        let CTX;
+
+        function statusStrip() {
+          const e = CTX.data.engine;
+          return (
+            '<dl class="cc-status">' +
+            '<dt>Status</dt><dd><span class="slds-badge badge-warning">' + e.status + "</span></dd>" +
+            "<dt>Files</dt><dd>Preprocessed " + e.filesPrep + " · Extracted " + e.filesExt + "</dd>" +
+            "<dt>Completed</dt><dd>" + e.completed + "</dd></dl>"
+          );
+        }
+
+        function countChip() {
+          const n = CTX.selectedCount(state.scope);
+          return '<span class="cc-count' + (n === 0 ? " none" : "") + '">' + n + " of " + CTX.data.lines.length + " lines</span>";
+        }
+
+        function runSummaryHTML() {
+          const r = CTX.computeRunSummary(state.scope);
+          const empty = !CTX.hasSel();
+          const icon = { docs: "📄", populate: "✓", lock: "🔒", protect: "🔒" };
+          const lines = r.lines.map((l) => '<div class="run-line run-line--' + l.kind + '"><span class="rl-ic">' + (icon[l.kind] || "•") + "</span><span>" + CTX.esc(l.text) + "</span></div>").join("");
+          return '<div class="run-summary' + (empty ? " is-empty" : "") + '">' + (empty ? '<p class="cc-hint" style="margin:0">Tap a tile to preview.</p>' : lines) + "</div>";
+        }
+
+        function render() {
+          const mount = document.getElementById("cc-body");
+          mount.innerHTML = statusStrip();
+          mount.appendChild(CTX.momentStepper(state.moment, go));
+          const box = document.createElement("div");
+          if (state.moment === 0) box.innerHTML = mArrival();
+          else if (state.moment === 1) box.innerHTML = mFiles();
+          else if (state.moment === 2) box.innerHTML = mScope();
+          else box.innerHTML = mRun();
+          mount.appendChild(box);
+          bind(box);
+        }
+
+        function mArrival() {
+          return CTX.bellAlertHTML() + '<div class="cc-actions"><button class="slds-btn slds-btn--brand" data-go="1">Review documents →</button></div>';
+        }
+
+        function mFiles() {
+          return (
+            '<p class="cc-section-title">Documents</p>' +
+            CTX.renderFiles(state.scope) +
+            '<div class="cc-actions"><button class="slds-btn" data-go="0">← Back</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="2">Next: lines →</button></div>'
+          );
+        }
+
+        function wideTile() {
+          const on = state.scope.whole;
+          return (
+            '<button class="tile wide' + (on ? " on" : "") + '" data-mode-tile aria-pressed="' + on + '">' +
+            '<div class="tile-top"><span class="tile-name">Entire submission</span>' + (on ? '<span class="tile-check">✓</span>' : "") + "</div>" +
+            '<span class="tile-state">' + (on ? "Will populate — all " + CTX.data.lines.length + " lines" : "Select all " + CTX.data.lines.length + " lines") + "</span>" +
+            "</button>"
+          );
+        }
+
+        function lineTile(l) {
+          const forced = state.scope.whole;
+          const on = forced || state.scope.lob.has(l.id);
+          const tag = l.kind === "sub" ? '<span class="line-sub-tag">Submission-level</span>' : "";
+          return (
+            '<button class="tile' + (on ? " on" : "") + (forced ? " is-forced" : "") + '"' +
+            (forced ? " disabled" : ' data-line="' + l.id + '"') +
+            ' aria-pressed="' + on + '">' +
+            '<div class="tile-top"><span class="tile-name">' + CTX.esc(l.label) + tag + "</span>" + (on ? '<span class="tile-check">✓</span>' : "") + "</div>" +
+            '<span class="tile-state">' + (on ? "Will populate" : "Locked") + "</span>" +
+            "</button>"
+          );
+        }
+
+        function mScope() {
+          const tiles = CTX.data.lines.map(lineTile).join("");
+          return (
+            '<div class="cc-title-row"><p class="cc-section-title">Choose what to populate</p>' + countChip() + "</div>" +
+            '<div class="tile-grid">' + wideTile() + tiles + "</div>" +
+            runSummaryHTML() +
+            '<div class="cc-actions"><button class="slds-btn" data-go="1">← Documents</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="3">Review →</button></div>'
+          );
+        }
+
+        function mRun() {
+          return (
+            '<div class="cc-title-row"><p class="cc-section-title">Reprocess</p>' + countChip() + "</div>" +
+            runSummaryHTML() +
+            '<div class="cc-actions"><button class="slds-btn slds-btn--brand" data-reprocess ' + (!CTX.hasSel() ? "disabled" : "") + ">Reprocess</button>" +
+            '<button class="slds-btn" data-processnew>Process as New</button><span class="spacer"></span><button class="slds-btn" data-go="2">← Adjust</button></div>'
+          );
+        }
+
+        function go(i) { state.moment = i; history.replaceState(null, "", "#m" + i); render(); }
+
+        function bind(box) {
+          box.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => go(Number(b.dataset.go))));
+          box.querySelectorAll(".doc-toggle").forEach((b) => (b.onclick = () => { const n = b.dataset.doc; state.scope.excludedDocs.has(n) ? state.scope.excludedDocs.delete(n) : state.scope.excludedDocs.add(n); render(); }));
+          box.querySelectorAll("[data-mode-tile]").forEach((b) => (b.onclick = () => { state.scope.whole = !state.scope.whole; render(); }));
+          box.querySelectorAll("[data-line]").forEach((b) => (b.onclick = () => { const id = b.dataset.line; state.scope.lob.has(id) ? state.scope.lob.delete(id) : state.scope.lob.add(id); render(); }));
+          const rp = box.querySelector("[data-reprocess]");
+          if (rp) rp.onclick = async () => { const ok = await CTX.runReprocess(state.scope); if (ok) { state.scope = ASTRUS.newScope(); go(0); } };
+          const pn = box.querySelector("[data-processnew]");
+          if (pn) pn.onclick = async () => { const ok = await CTX.confirmModal({ title: "Process as a new submission?", body: "<p>Ignores your scope and rebuilds everything as a fresh submission.</p>", confirmLabel: "Process as New", destructive: true }); if (ok) CTX.toast("success", "Process as New started", "A new submission was sent to the engine."); };
+        }
+
+        window.CONCEPT = { name: "Coverage Tiles", render: function (mount, ctx) { CTX = ctx; CTX.hasSel = () => state.scope.whole || state.scope.lob.size > 0; render(); } };
+        ASTRUS.boot(window.CONCEPT);
+      })();
+    </script>
+  </body>
+</html>
