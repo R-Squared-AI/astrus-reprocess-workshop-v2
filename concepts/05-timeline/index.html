@@ -145,8 +145,8 @@
           return (
             '<div class="cc-title-row"><span></span>' + countChip() + "</div>" +
             '<div class="cc-mode">' +
-            '<div class="cc-mode-opt' + (!state.scope.whole ? " on" : "") + '" data-mode="selected"><span class="cc-mode-radio"></span><div class="cc-mode-title">Only chosen lines</div></div>' +
             '<div class="cc-mode-opt' + (state.scope.whole ? " on" : "") + '" data-mode="whole"><span class="cc-mode-radio"></span><div class="cc-mode-title">Entire submission (' + CTX.data.lines.length + ")</div></div>" +
+            '<div class="cc-mode-opt' + (!state.scope.whole ? " on" : "") + '" data-mode="selected"><span class="cc-mode-radio"></span><div class="cc-mode-title">Only chosen lines</div></div>' +
             "</div>" +
             '<div class="line-list">' + rows + "</div>" +
             errHTML() +

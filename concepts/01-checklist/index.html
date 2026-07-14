@@ -76,8 +76,8 @@
           return (
             '<div class="cc-title-row"><p class="cc-section-title">Choose what to ' + CTX.verb.toLowerCase() + "</p>" + countChip() + "</div>" +
             '<div class="cc-mode">' +
-            '<div class="cc-mode-opt' + (!state.scope.whole ? " on" : "") + '" data-mode="selected"><span class="cc-mode-radio"></span><div class="cc-mode-title">Only the lines I choose</div></div>' +
-            '<div class="cc-mode-opt' + (state.scope.whole ? " on" : "") + '" data-mode="whole"><span class="cc-mode-radio"></span><div class="cc-mode-title">Entire submission (' + CTX.data.lines.length + ")</div></div></div>" +
+            '<div class="cc-mode-opt' + (state.scope.whole ? " on" : "") + '" data-mode="whole"><span class="cc-mode-radio"></span><div class="cc-mode-title">Entire submission (' + CTX.data.lines.length + ")</div></div>" +
+            '<div class="cc-mode-opt' + (!state.scope.whole ? " on" : "") + '" data-mode="selected"><span class="cc-mode-radio"></span><div class="cc-mode-title">Only the lines I choose</div></div></div>' +
             '<div class="line-list">' + rows + "</div>" +
             runSummaryHTML() + errHTML() +
             '<div class="cc-actions"><button class="slds-btn" data-back>← Review</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-next>Next →</button></div>'
