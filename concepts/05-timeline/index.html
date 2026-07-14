@@ -37,10 +37,14 @@
       .tl-node--done .tl-head-title { color: #0a3d1c; }
       .tl-node--active .tl-head-title { color: #014486; font-size: 14.5px; }
       .tl-node--upcoming .tl-head-title { color: #8a94a0; font-weight: 600; }
+      .tl-node--locked .tl-dot { background: #f4f5f7; border-color: #dde3ea; color: #b7bec7; font-size: 11px; }
+      .tl-node--locked .tl-head-title { color: #b7bec7; font-weight: 600; }
+      .tl-node--locked .tl-head { cursor: not-allowed; }
       .tl-node--hist .tl-head { cursor: default; }
       .tl-head:hover .tl-head-title { text-decoration: underline; }
       .tl-node--hist .tl-head:hover .tl-head-title,
-      .tl-node--upcoming .tl-head:hover .tl-head-title { text-decoration: none; }
+      .tl-node--upcoming .tl-head:hover .tl-head-title,
+      .tl-node--locked .tl-head:hover .tl-head-title { text-decoration: none; }
       .tl-node--upcoming .tl-head:hover .tl-head-title { color: #0176d3; }
       .tl-body {
         margin-top: 9px; border: 1.5px solid #b6d8f7; background: #f7fbff; border-radius: 10px;
@@ -56,11 +60,21 @@
     <script src="../../assets/shell.js"></script>
     <script>
       (function () {
-        const state = { moment: 0, scope: null, runs: [] };
+        const state = { moment: 0, max: 0, err: null, scope: null, runs: [] };
         let CTX, MOUNT;
 
         const NODE_TITLES = ["Upload attachments", "Review attachments", "Choose lines", ""];
         function nowTitle() { return "NOW — " + CTX.finalLabel; }
+
+        // gate helpers — return an error string, or null if the current node is satisfied
+        function gate(step) {
+          if (step === 0) return CTX.uploadError(state.scope);
+          if (step === 2) return CTX.lineError(state.scope);
+          return null;
+        }
+        function errHTML() {
+          return state.err ? '<div class="cc-err">⚠ ' + CTX.esc(state.err) + "</div>" : "";
+        }
 
         function statusTitle() {
           return CTX.mode === "additional" ? "Submission created · " + CTX.data.sub : "Communication created";
@@ -121,7 +135,7 @@
 
         /* ---- body content per active node -------------------------------- */
         function bodyUpload() {
-          return CTX.renderUploadStep(state.scope) + actions(null, "", '<button class="slds-btn slds-btn--brand" data-go="1">Next: review →</button>');
+          return CTX.renderUploadStep(state.scope) + errHTML() + actions(null, "", '<button class="slds-btn slds-btn--brand" data-go="1">Next: review →</button>');
         }
         function bodyReview() {
           return CTX.renderReview(state.scope) + actions(0, "← Upload", '<button class="slds-btn slds-btn--brand" data-go="2">Next: lines →</button>');
@@ -135,6 +149,7 @@
             '<div class="cc-mode-opt' + (state.scope.whole ? " on" : "") + '" data-mode="whole"><span class="cc-mode-radio"></span><div class="cc-mode-title">Entire submission (' + CTX.data.lines.length + ")</div></div>" +
             "</div>" +
             '<div class="line-list">' + rows + "</div>" +
+            errHTML() +
             actions(1, "← Review", '<button class="slds-btn slds-btn--brand" data-go="3">Next →</button>')
           );
         }
@@ -150,14 +165,17 @@
         function cycleNode(i) {
           const isActive = i === state.moment;
           const isDone = i < state.moment;
-          const cls = isActive ? "tl-node--active" : isDone ? "tl-node--done" : "tl-node--upcoming";
+          const reached = i <= state.max;
+          const locked = !reached;
+          const cls = isActive ? "tl-node--active" : isDone ? "tl-node--done" : locked ? "tl-node--locked" : "tl-node--upcoming";
           const title = i === 3 ? nowTitle() : NODE_TITLES[i];
-          const dot = isDone ? "✓" : String(i + 1);
+          const dot = isDone ? "✓" : locked ? "🔒" : String(i + 1);
           const summary = isDone && !isActive ? '<span class="tl-head-summary">' + summaryFor(i) + "</span>" : "";
           const body = isActive ? '<div class="tl-body">' + BODIES[i]() + "</div>" : "";
+          const disabledAttr = locked ? " disabled aria-disabled=\"true\"" : "";
           return (
             '<div class="tl-node ' + cls + '"><div class="tl-rail-col"><div class="tl-dot">' + dot + "</div></div>" +
-            '<div class="tl-content"><button class="tl-head" data-node="' + i + '"><span class="tl-head-title">' + CTX.esc(title) + "</span>" + summary + "</button>" + body + "</div></div>"
+            '<div class="tl-content"><button class="tl-head" data-node="' + i + '"' + disabledAttr + '><span class="tl-head-title">' + CTX.esc(title) + "</span>" + summary + "</button>" + body + "</div></div>"
           );
         }
 
@@ -176,6 +194,7 @@
         }
 
         function render() {
+          if (state.err && !gate(state.moment)) state.err = null;
           MOUNT.innerHTML = "";
           const rail = document.createElement("div");
           rail.className = "tl-rail";
@@ -188,14 +207,38 @@
           if (state.moment === 0) CTX.bindUploadStep(rail, state.scope, render);
         }
 
-        function go(i) { state.moment = i; render(); }
+        // jump to an already-reached node (rail header click) — no gate, no max change
+        function goNode(i) {
+          if (i > state.max) return;
+          state.err = null;
+          state.moment = i;
+          render();
+        }
+        // step backward (Back buttons) — no gate
+        function goBack(i) {
+          state.err = null;
+          state.moment = i;
+          render();
+        }
+        // step forward (Next buttons) — gated on the step being left
+        function advance(i) {
+          const e = gate(state.moment);
+          if (e) { state.err = e; render(); return; }
+          state.err = null;
+          state.moment = i;
+          state.max = Math.max(state.max, i);
+          render();
+        }
 
         function bind(rail) {
           rail.querySelectorAll("[data-node]").forEach((b) => {
             if (b.disabled) return;
-            b.onclick = () => go(Number(b.dataset.node));
+            b.onclick = () => goNode(Number(b.dataset.node));
           });
-          rail.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => go(Number(b.dataset.go))));
+          rail.querySelectorAll("[data-go]").forEach((b) => {
+            const target = Number(b.dataset.go);
+            b.onclick = () => { if (target > state.moment) advance(target); else goBack(target); };
+          });
           rail.querySelectorAll(".doc-toggle").forEach((b) => (b.onclick = () => {
             const n = b.dataset.doc;
             state.scope.excludedDocs.has(n) ? state.scope.excludedDocs.delete(n) : state.scope.excludedDocs.add(n);
@@ -215,6 +258,8 @@
               state.runs.push({ label: CTX.finalLabel + ": " + (state.scope.whole ? "entire submission" : sel.map((l) => l.label).join(", ")), when: "Just now" });
               state.scope = CTX.newScope();
               state.moment = 0;
+              state.max = 0;
+              state.err = null;
               render();
             }
           };

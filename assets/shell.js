@@ -120,20 +120,26 @@
   function statusStripHTML() {
     if (MODE === "additional") {
       return (
-        '<dl class="cc-status" id="cc-status">' +
-        '<dt>Status</dt><dd><span class="slds-badge badge-warning">Requires Review</span></dd>' +
-        "<dt>Stage</dt><dd>complete</dd>" +
-        "<dt>Files</dt><dd>Preprocessed 5 · Extracted 5</dd>" +
-        "<dt>Last Progress</dt><dd>7/13/2026, 4:10:13 PM</dd>" +
-        "<dt>Completed</dt><dd>7/13/2026, 4:22:32 PM</dd></dl>"
+        '<div class="cc-status2" id="cc-status">' +
+        '<div class="cc-status2-top">' +
+        '<span class="slds-badge badge-warning cc-status2-badge">Requires Review</span>' +
+        '<span class="cc-stage"><span class="cc-stage-dot"></span>Complete</span>' +
+        "</div>" +
+        '<div class="cc-status2-metrics">' +
+        '<div class="csm"><span class="csm-v">5 / 5</span><span class="csm-l">Preprocessed</span></div>' +
+        '<div class="csm"><span class="csm-v">5 / 5</span><span class="csm-l">Extracted</span></div>' +
+        '<div class="csm"><span class="csm-v">4:22 PM</span><span class="csm-l">Completed</span></div>' +
+        "</div></div>"
       );
     }
     return (
-      '<dl class="cc-status" id="cc-status">' +
-      '<dt>Status</dt><dd><span class="slds-badge badge-neutral">Not processed</span></dd>' +
-      "<dt>Stage</dt><dd>—</dd>" +
-      "<dt>Files</dt><dd>Preprocessed 0 · Extracted 0</dd>" +
-      "<dt>Submission</dt><dd>Not created yet</dd></dl>"
+      '<div class="cc-status2" id="cc-status">' +
+      '<div class="cc-status2-top">' +
+      '<span class="slds-badge badge-neutral cc-status2-badge">Not processed</span>' +
+      '<span class="cc-stage cc-stage--draft">Draft</span>' +
+      "</div>" +
+      '<div class="cc-status2-hint">Awaiting attachments — upload to create the submission.</div>' +
+      "</div>"
     );
   }
 
@@ -365,7 +371,8 @@
   }
 
   /* ---- moment stepper (leading 'Created' status tile + 4 steps) -------- */
-  function momentStepper(current, onNav) {
+  function momentStepper(current, onNav, maxReached) {
+    if (maxReached == null) maxReached = current;
     const bar = document.createElement("div");
     bar.className = "cc-stepper";
     bar.setAttribute("role", "tablist");
@@ -375,15 +382,25 @@
     s.innerHTML = '<span class="cc-step-num">✓</span><span class="cc-step-label">' + (MODE === "additional" ? "Submission" : "Created") + "</span>";
     bar.appendChild(s);
     moments().forEach((m, i) => {
+      const reached = i <= maxReached;
       const b = document.createElement("button");
-      b.className = "cc-step" + (i === current ? " is-current" : "") + (i < current ? " is-done" : "");
+      b.className = "cc-step" + (i === current ? " is-current" : "") + (i < current ? " is-done" : "") + (reached ? "" : " is-locked");
       b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", i === current ? "true" : "false");
       b.innerHTML = '<span class="cc-step-num">' + (i < current ? "✓" : m.num) + '</span><span class="cc-step-label">' + m.label + "</span>";
-      b.onclick = () => onNav(i);
+      if (reached) b.onclick = () => onNav(i);
+      else b.disabled = true;
       bar.appendChild(b);
     });
     return bar;
+  }
+
+  // gate helpers — return an error string, or null if the step is satisfied
+  function uploadError(scope) {
+    return scope.uploaded.length ? null : MODE === "additional" ? "Please upload additional attachments." : "Please upload attachments.";
+  }
+  function lineError(scope) {
+    return hasSelection(scope) ? null : "Please select at least one line of business.";
   }
 
   /* ---- static Salesforce chrome ---------------------------------------- */
@@ -477,16 +494,23 @@
     // New submission = simple: just Upload → Process (no review, no line picking).
     if (MODE === "initial") {
       const scope = newScope();
+      let initErr = null;
       function renderInit() {
         mount.innerHTML =
           bannerHTML() +
           renderUploadStep(scope) +
           '<div class="cc-initnote">Astrus reads every uploaded attachment and creates the submission — <strong>all lines of business</strong> at once. You fine-tune individual lines later by reprocessing.</div>' +
-          '<div class="cc-actions"><span class="spacer"></span><button class="slds-btn slds-btn--brand" id="cc-init-run"' +
-          (scope.uploaded.length ? "" : " disabled") + ">Process submission →</button></div>";
-        bindUploadStep(mount, scope, renderInit);
+          (initErr ? '<div class="cc-err">⚠ ' + esc(initErr) + "</div>" : "") +
+          '<div class="cc-actions"><span class="spacer"></span><button class="slds-btn slds-btn--brand" id="cc-init-run">Process submission →</button></div>';
+        bindUploadStep(mount, scope, function () { initErr = null; renderInit(); });
         const b = mount.querySelector("#cc-init-run");
-        if (b) b.onclick = async () => { const ok = await runProcess(scope); if (ok) { scope.uploaded = []; renderInit(); } };
+        if (b) b.onclick = async () => {
+          const e = uploadError(scope);
+          if (e) { initErr = e; renderInit(); return; }
+          initErr = null;
+          const ok = await runProcess(scope);
+          if (ok) { scope.uploaded = []; renderInit(); }
+        };
       }
       renderInit();
       document.title = "Astrus New Submission · " + conceptName;
@@ -513,6 +537,8 @@
       selectedCount: selectedCount,
       hasSelection: hasSelection,
       hasUploads: hasUploads,
+      uploadError: uploadError,
+      lineError: lineError,
       bannerHTML: bannerHTML,
       renderUploadStep: renderUploadStep,
       bindUploadStep: bindUploadStep,

@@ -34,6 +34,13 @@
       }
       .cbar-footer { flex: none; }
       .cbar-footer .cbar-hint { display: block; margin: 8px 0 0; }
+      /* Reserved-height slot for the gate error: ALWAYS rendered (empty or
+         filled) so the footer's total height — and therefore the pinned
+         primary button's pixel position — never shifts when the error
+         appears or clears. This mirrors the .cbar-scroll fixed-height trick
+         above, just applied to the footer instead of the scroll box. */
+      .cbar-errslot { height: 40px; display: flex; align-items: center; }
+      .cbar-errslot .cc-err { margin: 0; width: 100%; box-sizing: border-box; }
       .cbar-primary { font-size: 14px; padding: 9px 22px; font-weight: 700; white-space: nowrap; }
       .cc-actions .slds-btn { white-space: nowrap; }
 
@@ -103,7 +110,7 @@
     <script src="../../assets/shell.js"></script>
     <script>
       (function () {
-        const state = { scope: ASTRUS.newScope() };
+        const state = { scope: ASTRUS.newScope(), err: null };
         let CTX;
 
         function countChip() {
@@ -226,15 +233,19 @@
         }
 
         function render() {
+          const upErr = CTX.uploadError(state.scope);
+          const lnErr = CTX.lineError(state.scope);
+          if (upErr === null && (CTX.mode !== "additional" || lnErr === null)) state.err = null;
           const mount = document.getElementById("cc-body");
           mount.innerHTML =
             '<div class="cbar-shell">' +
             '<div class="cbar-scroll" id="cbar-scroll">' + cardHTML() + "</div>" +
-            '<div class="cbar-footer"><div class="cc-actions">' +
+            '<div class="cbar-footer">' +
+            '<div class="cbar-errslot">' + (state.err ? '<div class="cc-err">⚠ ' + CTX.esc(state.err) + "</div>" : "") + "</div>" +
+            '<div class="cc-actions">' +
             '<button class="slds-btn" data-clear' + (isScopeClean() ? " disabled" : "") + ">Clear</button>" +
             '<span class="spacer"></span>' +
-            '<button class="slds-btn slds-btn--brand cbar-primary" data-run' +
-            (!CTX.hasUploads(state.scope) || !CTX.hasSelection(state.scope) ? " disabled" : "") + ">" + CTX.esc(CTX.finalLabel) + "</button>" +
+            '<button class="slds-btn slds-btn--brand cbar-primary" data-run>' + CTX.esc(CTX.finalLabel) + "</button>" +
             "</div><span class=\"cbar-hint\">" + footerHint() + "</span>" +
             "</div></div>";
           bind(mount);
@@ -263,12 +274,19 @@
           mount.querySelectorAll("[data-doc-add]").forEach((b) => (b.onclick = () => { state.scope.excludedDocs.delete(b.dataset.docAdd); render(); }));
 
           const clearBtn = mount.querySelector("[data-clear]");
-          if (clearBtn) clearBtn.onclick = () => { state.scope = ASTRUS.newScope(); render(); };
+          if (clearBtn) clearBtn.onclick = () => { state.scope = ASTRUS.newScope(); state.err = null; render(); };
 
           const rp = mount.querySelector("[data-run]");
           if (rp) rp.onclick = async () => {
+            const upErr = CTX.uploadError(state.scope);
+            if (upErr) { state.err = upErr; render(); return; }
+            if (CTX.mode === "additional") {
+              const lnErr = CTX.lineError(state.scope);
+              if (lnErr) { state.err = lnErr; render(); return; }
+            }
+            state.err = null;
             const ok = await CTX.runProcess(state.scope);
-            if (ok) { state.scope = ASTRUS.newScope(); render(); }
+            if (ok) { state.scope = ASTRUS.newScope(); state.err = null; render(); }
           };
         }
 

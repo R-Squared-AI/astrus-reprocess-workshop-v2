@@ -18,7 +18,7 @@
     <script src="../../assets/shell.js"></script>
     <script>
       (function () {
-        const state = { scope: ASTRUS.newScope() };
+        const state = { scope: ASTRUS.newScope(), err: null };
         let CTX;
 
         function countChip() {
@@ -71,13 +71,18 @@
         }
 
         function render() {
+          if (state.err && CTX.uploadError(state.scope) === null && (CTX.mode !== "additional" || CTX.lineError(state.scope) === null)) {
+            state.err = null;
+          }
           const mount = document.getElementById("cc-body");
           mount.innerHTML =
             CTX.bannerHTML() +
             '<div class="ad-block">' + CTX.renderUploadStep(state.scope) + "</div>" +
             '<div class="ad-block">' + CTX.renderReview(state.scope) + "</div>" +
             '<div class="ad-block">' + linesSectionHTML() + "</div>" +
-            '<div class="ad-block">' + runSummaryHTML() + actionsHTML() + "</div>";
+            '<div class="ad-block">' + runSummaryHTML() +
+            (state.err ? '<div class="cc-err">⚠ ' + CTX.esc(state.err) + "</div>" : "") +
+            actionsHTML() + "</div>";
           bind(mount);
           CTX.bindUploadStep(mount, state.scope, render);
         }
@@ -87,7 +92,17 @@
           mount.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => { state.scope.whole = b.dataset.mode === "whole"; render(); }));
           mount.querySelectorAll("[data-line]").forEach((b) => (b.onclick = () => { const id = b.dataset.line; state.scope.lob.has(id) ? state.scope.lob.delete(id) : state.scope.lob.add(id); render(); }));
           const rp = mount.querySelector("[data-run]");
-          if (rp) rp.onclick = async () => { const ok = await CTX.runProcess(state.scope); if (ok) { state.scope = ASTRUS.newScope(); render(); } };
+          if (rp) rp.onclick = async () => {
+            const ue = CTX.uploadError(state.scope);
+            if (ue) { state.err = ue; render(); return; }
+            if (CTX.mode === "additional") {
+              const le = CTX.lineError(state.scope);
+              if (le) { state.err = le; render(); return; }
+            }
+            state.err = null;
+            const ok = await CTX.runProcess(state.scope);
+            if (ok) { state.scope = ASTRUS.newScope(); state.err = null; render(); }
+          };
           const sec = mount.querySelector("[data-secondary]");
           if (sec) {
             sec.onclick = async () => {

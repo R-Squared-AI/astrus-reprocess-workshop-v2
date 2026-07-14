@@ -12,14 +12,20 @@
     <script src="../../assets/shell.js"></script>
     <script>
       (function () {
-        const state = { moment: 0, scope: ASTRUS.newScope() };
-        const _hm = location.hash.match(/m(\d)/);
-        if (_hm) state.moment = Number(_hm[1]);
+        const state = { moment: 0, max: 0, err: null, scope: ASTRUS.newScope() };
         let CTX;
 
+        function gate(step) {
+          if (step === 0) return CTX.uploadError(state.scope);
+          if (step === 2) return CTX.lineError(state.scope);
+          return null;
+        }
         function countChip() {
           const n = CTX.selectedCount(state.scope);
           return '<span class="cc-count' + (n === 0 ? " none" : "") + '">' + n + " of " + CTX.data.lines.length + " lines</span>";
+        }
+        function errHTML() {
+          return state.err ? '<div class="cc-err">⚠ ' + CTX.esc(state.err) + "</div>" : "";
         }
         function runSummaryHTML() {
           const r = CTX.computeRunSummary(state.scope);
@@ -30,9 +36,10 @@
         }
 
         function render() {
+          if (state.err && !gate(state.moment)) state.err = null;
           const mount = document.getElementById("cc-body");
           mount.innerHTML = "";
-          mount.appendChild(CTX.momentStepper(state.moment, go));
+          mount.appendChild(CTX.momentStepper(state.moment, onStep, state.max));
           const box = document.createElement("div");
           if (state.moment === 0) box.innerHTML = CTX.bannerHTML() + mUpload();
           else if (state.moment === 1) box.innerHTML = mReview();
@@ -44,14 +51,13 @@
         }
 
         function mUpload() {
-          return CTX.renderUploadStep(state.scope) +
-            '<div class="cc-actions"><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="1">Next: review →</button></div>';
+          return CTX.renderUploadStep(state.scope) + errHTML() +
+            '<div class="cc-actions"><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-next>Next: review →</button></div>';
         }
         function mReview() {
-          return '<p class="cc-section-title">Review attachments</p>' + CTX.renderReview(state.scope) +
-            '<div class="cc-actions"><button class="slds-btn" data-go="0">← Upload</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="2">Next: lines →</button></div>';
+          return '<p class="cc-section-title">Review attachments</p>' + CTX.renderReview(state.scope) + errHTML() +
+            '<div class="cc-actions"><button class="slds-btn" data-back>← Upload</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-next>Next: lines →</button></div>';
         }
-
         function lineRow(l) {
           const tag = l.kind === "sub" ? '<span class="line-sub-tag">Submission-level</span>' : "";
           if (state.scope.whole) {
@@ -73,28 +79,38 @@
             '<div class="cc-mode-opt' + (!state.scope.whole ? " on" : "") + '" data-mode="selected"><span class="cc-mode-radio"></span><div class="cc-mode-title">Only the lines I choose</div></div>' +
             '<div class="cc-mode-opt' + (state.scope.whole ? " on" : "") + '" data-mode="whole"><span class="cc-mode-radio"></span><div class="cc-mode-title">Entire submission (' + CTX.data.lines.length + ")</div></div></div>" +
             '<div class="line-list">' + rows + "</div>" +
-            runSummaryHTML() +
-            '<div class="cc-actions"><button class="slds-btn" data-go="1">← Review</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="3">Next →</button></div>'
+            runSummaryHTML() + errHTML() +
+            '<div class="cc-actions"><button class="slds-btn" data-back>← Review</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-next>Next →</button></div>'
           );
         }
         function mFinal() {
           return (
             '<div class="cc-title-row"><p class="cc-section-title">' + CTX.finalLabel + "</p>" + countChip() + "</div>" +
             runSummaryHTML() +
-            '<div class="cc-actions"><button class="slds-btn" data-go="2">← Lines</button><span class="spacer"></span>' +
-            '<button class="slds-btn slds-btn--brand" data-run ' + (!CTX.hasSelection(state.scope) ? "disabled" : "") + ">" + CTX.finalLabel + " →</button></div>"
+            '<div class="cc-actions"><button class="slds-btn" data-back>← Lines</button><span class="spacer"></span>' +
+            '<button class="slds-btn slds-btn--brand" data-run>' + CTX.finalLabel + ' →</button></div>'
           );
         }
 
-        function go(i) { state.moment = i; history.replaceState(null, "", "#m" + i); render(); }
+        function go(i) { state.moment = i; state.max = Math.max(state.max, i); state.err = null; render(); }
+        function onStep(i) { if (i <= state.max) go(i); }
+        function next() {
+          const e = gate(state.moment);
+          if (e) { state.err = e; render(); return; }
+          go(state.moment + 1);
+        }
+        function back() { state.err = null; state.moment = Math.max(0, state.moment - 1); render(); }
 
         function bind(box) {
-          box.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => go(Number(b.dataset.go))));
+          const nx = box.querySelector("[data-next]");
+          if (nx) nx.onclick = next;
+          const bk = box.querySelector("[data-back]");
+          if (bk) bk.onclick = back;
           box.querySelectorAll(".doc-toggle").forEach((b) => (b.onclick = () => { const n = b.dataset.doc; state.scope.excludedDocs.has(n) ? state.scope.excludedDocs.delete(n) : state.scope.excludedDocs.add(n); render(); }));
           box.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => { state.scope.whole = b.dataset.mode === "whole"; render(); }));
           box.querySelectorAll("[data-line]").forEach((b) => (b.onclick = () => { const id = b.dataset.line; state.scope.lob.has(id) ? state.scope.lob.delete(id) : state.scope.lob.add(id); render(); }));
           const rp = box.querySelector("[data-run]");
-          if (rp) rp.onclick = async () => { const ok = await CTX.runProcess(state.scope); if (ok) { state.scope = ASTRUS.newScope(); go(0); } };
+          if (rp) rp.onclick = async () => { const ok = await CTX.runProcess(state.scope); if (ok) { state.scope = ASTRUS.newScope(); state.max = 0; go(0); } };
         }
 
         window.CONCEPT = { name: "Checklist", render: function (mount, ctx) { CTX = ctx; render(); } };

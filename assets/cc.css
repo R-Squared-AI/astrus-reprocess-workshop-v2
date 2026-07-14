@@ -855,3 +855,21 @@
 .docs-note { display: flex; gap: 9px; align-items: flex-start; background: var(--sf-warn-bg); border: 1px solid var(--sf-warn-border); border-left: 4px solid var(--sf-warn); border-radius: var(--sf-radius); padding: 10px 12px; margin-bottom: 12px; font-size: 12px; line-height: 1.45; }
 .docs-note-ic { flex: none; }
 .cc-initnote { background: #eef4fb; border: 1px solid #c9def5; border-left: 4px solid var(--sf-brand); border-radius: var(--sf-radius); padding: 11px 14px; margin-top: 14px; font-size: 12.5px; line-height: 1.5; color: var(--sf-text-weak); }
+
+/* ==== Round 9 — cleaner status, nav gate + red errors ================== */
+.cc-status2 { padding: 14px 18px; border-bottom: 1px solid #e7eaee; background: #f6f8fb; }
+.cc-status2-top { display: flex; align-items: center; gap: 12px; }
+.cc-status2-badge { font-size: 12px; }
+.cc-stage { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--sf-text-weak); }
+.cc-stage-dot { width: 8px; height: 8px; border-radius: 50%; background: #2e844a; }
+.cc-stage--draft { color: var(--sf-text-weaker); font-weight: 600; }
+.cc-status2-metrics { display: flex; gap: 26px; margin-top: 13px; }
+.csm { display: flex; flex-direction: column; }
+.csm-v { font-size: 15px; font-weight: 700; color: var(--sf-text); letter-spacing: -0.01em; }
+.csm-l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--sf-text-weaker); margin-top: 2px; }
+.cc-status2-hint { font-size: 12px; color: var(--sf-text-weaker); margin-top: 8px; }
+
+.cc-err { display: flex; align-items: center; gap: 7px; background: #feded8; border: 1px solid #f4a29a; color: #a3160f; border-radius: var(--sf-radius); padding: 8px 12px; font-size: 12.5px; font-weight: 600; margin: 12px 0 0; }
+
+.cc-step.is-locked { opacity: 0.45; cursor: not-allowed; }
+.cc-step.is-locked:hover { border-color: #dfe3e8; background: #fff; }
