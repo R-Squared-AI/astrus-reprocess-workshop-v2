@@ -59,7 +59,7 @@
         }
 
         function mArrival() {
-          return CTX.bellAlertHTML() + '<div class="cc-actions"><button class="slds-btn slds-btn--brand" data-go="1">Review documents →</button></div>';
+          return CTX.bellAlertHTML() + '<div class="cc-actions"><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="1">Review documents →</button></div>';
         }
 
         function mFiles() {
@@ -101,8 +101,8 @@
           return (
             '<div class="cc-title-row"><p class="cc-section-title">Reprocess</p>' + countChip() + "</div>" +
             runSummaryHTML() +
-            '<div class="cc-actions"><button class="slds-btn slds-btn--brand" data-reprocess ' + (!CTX.hasSel() ? "disabled" : "") + ">Reprocess</button>" +
-            '<button class="slds-btn" data-processnew>Process as New</button><span class="spacer"></span><button class="slds-btn" data-go="2">← Adjust</button></div>'
+            '<div class="cc-actions"><button class="slds-btn" data-go="2">← Adjust</button><button class="slds-btn" data-processnew>Process as New</button><span class="spacer"></span>' +
+            '<button class="slds-btn slds-btn--brand" data-reprocess ' + (!CTX.hasSel() ? "disabled" : "") + ">Reprocess →</button></div>"
           );
         }
 

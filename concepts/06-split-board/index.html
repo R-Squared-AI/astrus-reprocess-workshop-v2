@@ -7,16 +7,20 @@
     <link rel="stylesheet" href="../../assets/shell.css" />
     <link rel="stylesheet" href="../../assets/cc.css" />
     <style>
-      /* Split Board — two-lane scope picker (own styles; shared .board/.lane/.lane-item live in cc.css) */
+      /* Split Board — two-lane scope picker (own styles; shared .board/.lane/.lane-item live in cc.css)
+         Round 4: LEFT lane = not included, RIGHT lane = included, for BOTH the documents
+         board and the lines board. Documents come before Lines in the stepper. */
       .board-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 
       .lane-item { position: relative; align-items: flex-start; }
       .li-label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-      .li-name { line-height: 1.25; }
+      .li-name { line-height: 1.25; display: flex; align-items: center; gap: 6px; min-width: 0; }
+      .li-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+      .doc-meta { font-size: 11px; color: var(--sf-text-weaker); display: flex; align-items: center; gap: 6px; }
       .lane-item .line-sub-tag { white-space: nowrap; align-self: flex-start; }
-      .lane-move { flex: none; padding-top: 1px; }
-      .lane--lock .lane-move { color: var(--sf-brand); }
-      .lane--pop .lane-move { color: #6b7c90; }
+      .lane-move { flex: none; padding-top: 1px; white-space: nowrap; }
+      .lane--lock .lane-move { color: #6b7c90; }
+      .lane--pop .lane-move { color: var(--sf-brand); }
 
       @keyframes lanePopIn {
         0% { transform: scale(0.92) translateY(-3px); opacity: 0.35; background: #d6f3e0; }
@@ -31,7 +35,9 @@
       .lane-item.just-moved--pop { animation: lanePopIn 0.32s ease; }
       .lane-item.just-moved--lock { animation: laneLockIn 0.32s ease; }
 
-      @media (max-width: 380px) {
+      .board + .board { margin-top: 18px; }
+
+      @media (max-width: 480px) {
         .board { grid-template-columns: 1fr; }
       }
     </style>
@@ -41,7 +47,7 @@
     <script src="../../assets/shell.js"></script>
     <script>
       (function () {
-        const state = { moment: 0, scope: ASTRUS.newScope(), lastMoved: null };
+        const state = { moment: 0, scope: ASTRUS.newScope(), lastMoved: null, lastMovedDoc: null };
         const _hm = location.hash.match(/m(\d)/);
         if (_hm) state.moment = Number(_hm[1]);
         let CTX;
@@ -59,6 +65,11 @@
         function countChip() {
           const n = CTX.selectedCount(state.scope);
           return '<span class="cc-count' + (n === 0 ? " none" : "") + '">' + n + " of " + CTX.data.lines.length + " will populate</span>";
+        }
+
+        function docCountChip() {
+          const n = CTX.includedDocs(state.scope).length;
+          return '<span class="cc-count' + (n === 0 ? " none" : "") + '">' + n + " of " + CTX.data.files.length + " included</span>";
         }
 
         function runSummaryHTML() {
@@ -83,13 +94,41 @@
         }
 
         function mArrival() {
-          return CTX.bellAlertHTML() + '<div class="cc-actions"><button class="slds-btn slds-btn--brand" data-go="1">Review documents →</button></div>';
+          return CTX.bellAlertHTML() + '<div class="cc-actions"><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="1">Review documents →</button></div>';
+        }
+
+        /* ---- Documents split board: LEFT = excluded/not included, RIGHT = included. Docs start on the RIGHT. ---- */
+        function docLabelHTML(f) {
+          return (
+            '<span class="li-label"><span class="li-name"><span class="file-ic file-ic--' + f.type + '">' + f.type.toUpperCase() +
+            '</span><span class="li-name-text">' + CTX.esc(f.name) + "</span></span>" +
+            '<span class="doc-meta">' + CTX.esc(f.size) + (f.isNew ? ' <span class="file-tag file-tag--new">New</span>' : "") + "</span></span>"
+          );
+        }
+        function excludedItem(f) {
+          const cls = "lane-item" + (state.lastMovedDoc === f.name ? " just-moved just-moved--lock" : "");
+          return '<div class="' + cls + '" data-movedoc="' + CTX.esc(f.name) + '" role="button" tabindex="0" title="' + CTX.esc(f.name) + '">' + docLabelHTML(f) + '<span class="lane-move">→ include</span></div>';
+        }
+        function includedItem(f) {
+          const cls = "lane-item" + (state.lastMovedDoc === f.name ? " just-moved just-moved--pop" : "");
+          return '<div class="' + cls + '" data-movedoc="' + CTX.esc(f.name) + '" role="button" tabindex="0" title="' + CTX.esc(f.name) + '">' + docLabelHTML(f) + '<span class="lane-move">← exclude</span></div>';
         }
 
         function mFiles() {
+          const excluded = CTX.data.files.filter((f) => state.scope.excludedDocs.has(f.name));
+          const included = CTX.includedDocs(state.scope);
           return (
-            '<p class="cc-section-title">Documents</p>' +
-            CTX.renderFiles(state.scope) +
+            '<div class="cc-title-row"><p class="cc-section-title">Split the documents</p>' + docCountChip() + "</div>" +
+            '<p class="cc-section-sub">Click a document to move it between lanes. Everything starts included.</p>' +
+            '<div class="board-actions"><button class="slds-btn slds-btn--brand" data-docs-all' + (excluded.length ? "" : " disabled") + ">Move all → include</button>" +
+            '<button class="slds-btn" data-docs-clear' + (included.length ? "" : " disabled") + ">Clear</button></div>" +
+            '<div class="board">' +
+            '<div class="lane lane--lock"><div class="lane-head">Excluded · not included (' + excluded.length + ")</div>" +
+            (excluded.length ? excluded.map(excludedItem).join("") : '<div class="lane-empty">Nothing excluded.</div>') +
+            "</div>" +
+            '<div class="lane lane--pop"><div class="lane-head">Included (' + included.length + ")</div>" +
+            (included.length ? included.map(includedItem).join("") : '<div class="lane-empty">Nothing included — reprocess will read no documents.</div>') +
+            "</div></div>" +
             '<div class="cc-actions"><button class="slds-btn" data-go="0">← Back</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="2">Next: lines →</button></div>'
           );
         }
@@ -98,6 +137,7 @@
           return l.kind === "sub" ? '<span class="line-sub-tag">Submission-level</span>' : "";
         }
 
+        /* ---- Lines split board: LEFT = locked/not included, RIGHT = will populate. Lines start on the LEFT. ---- */
         function popItem(l) {
           const cls = "lane-item" + (l.kind === "sub" ? " is-sub" : "") + (state.lastMoved === l.id ? " just-moved just-moved--pop" : "");
           return '<div class="' + cls + '" data-move="' + l.id + '" role="button" tabindex="0"><span class="li-label"><span class="li-name">' + CTX.esc(l.label) + "</span>" + subTag(l) + '</span><span class="lane-move">← lock</span></div>';
@@ -115,11 +155,11 @@
             '<p class="cc-section-sub">Click a line to move it between lanes. Everything starts locked.</p>' +
             '<div class="board-actions"><button class="slds-btn slds-btn--brand" data-allpop>Move all → populate</button><button class="slds-btn" data-clear' + (CTX.hasSel() ? "" : " disabled") + ">Clear</button></div>" +
             '<div class="board">' +
+            '<div class="lane lane--lock"><div class="lane-head">Locked · not included (' + locked.length + ")</div>" +
+            (locked.length ? locked.map(lockItem).join("") : '<div class="lane-empty">Everything is populating.</div>') +
+            "</div>" +
             '<div class="lane lane--pop"><div class="lane-head">Will populate (' + pop.length + ")</div>" +
             (pop.length ? pop.map(popItem).join("") : '<div class="lane-empty">Nothing yet — move a line over.</div>') +
-            "</div>" +
-            '<div class="lane lane--lock"><div class="lane-head">Locked (' + locked.length + ")</div>" +
-            (locked.length ? locked.map(lockItem).join("") : '<div class="lane-empty">Everything is populating.</div>') +
             "</div></div>" +
             runSummaryHTML() +
             '<div class="cc-actions"><button class="slds-btn" data-go="1">← Documents</button><span class="spacer"></span><button class="slds-btn slds-btn--brand" data-go="3">Review →</button></div>'
@@ -130,8 +170,8 @@
           return (
             '<div class="cc-title-row"><p class="cc-section-title">Reprocess</p>' + countChip() + "</div>" +
             runSummaryHTML() +
-            '<div class="cc-actions"><button class="slds-btn slds-btn--brand" data-reprocess ' + (!CTX.hasSel() ? "disabled" : "") + ">Reprocess</button>" +
-            '<button class="slds-btn" data-processnew>Process as New</button><span class="spacer"></span><button class="slds-btn" data-go="2">← Adjust</button></div>'
+            '<div class="cc-actions"><button class="slds-btn" data-go="2">← Adjust</button><button class="slds-btn" data-processnew>Process as New</button><span class="spacer"></span>' +
+            '<button class="slds-btn slds-btn--brand" data-reprocess ' + (!CTX.hasSel() ? "disabled" : "") + ">Reprocess →</button></div>"
           );
         }
 
@@ -151,19 +191,33 @@
           render();
         }
 
+        function moveDoc(name) {
+          if (state.scope.excludedDocs.has(name)) state.scope.excludedDocs.delete(name);
+          else state.scope.excludedDocs.add(name);
+          state.lastMovedDoc = name;
+          render();
+        }
+
         function bind(box) {
           box.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => go(Number(b.dataset.go))));
-          box.querySelectorAll(".doc-toggle").forEach((b) => (b.onclick = () => { const n = b.dataset.doc; state.scope.excludedDocs.has(n) ? state.scope.excludedDocs.delete(n) : state.scope.excludedDocs.add(n); render(); }));
           box.querySelectorAll("[data-move]").forEach((el) => {
             el.onclick = () => moveLine(el.dataset.move);
             el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); moveLine(el.dataset.move); } };
+          });
+          box.querySelectorAll("[data-movedoc]").forEach((el) => {
+            el.onclick = () => moveDoc(el.dataset.movedoc);
+            el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); moveDoc(el.dataset.movedoc); } };
           });
           const allpop = box.querySelector("[data-allpop]");
           if (allpop) allpop.onclick = () => { state.scope.whole = true; state.lastMoved = null; render(); };
           const clear = box.querySelector("[data-clear]");
           if (clear) clear.onclick = () => { state.scope.whole = false; state.scope.lob.clear(); state.lastMoved = null; render(); };
+          const docsAll = box.querySelector("[data-docs-all]");
+          if (docsAll) docsAll.onclick = () => { state.scope.excludedDocs.clear(); state.lastMovedDoc = null; render(); };
+          const docsClear = box.querySelector("[data-docs-clear]");
+          if (docsClear) docsClear.onclick = () => { state.scope.excludedDocs = new Set(CTX.data.files.map((f) => f.name)); state.lastMovedDoc = null; render(); };
           const rp = box.querySelector("[data-reprocess]");
-          if (rp) rp.onclick = async () => { const ok = await CTX.runReprocess(state.scope); if (ok) { state.scope = ASTRUS.newScope(); state.lastMoved = null; go(0); } };
+          if (rp) rp.onclick = async () => { const ok = await CTX.runReprocess(state.scope); if (ok) { state.scope = ASTRUS.newScope(); state.lastMoved = null; state.lastMovedDoc = null; go(0); } };
           const pn = box.querySelector("[data-processnew]");
           if (pn) pn.onclick = async () => { const ok = await CTX.confirmModal({ title: "Process as a new submission?", body: "<p>Ignores your scope and rebuilds everything as a fresh submission.</p>", confirmLabel: "Process as New", destructive: true }); if (ok) CTX.toast("success", "Process as New started", "A new submission was sent to the engine."); };
         }

@@ -34,21 +34,20 @@
       .tl-meta em { font-style: normal; font-weight: 600; color: var(--sf-text-weak); }
       .tl-node--done .tl-title { color: #0a3d1c; }
       .tl-node--attn .tl-title { color: #7a4300; }
-      .tl-toggle {
-        margin-top: 8px; background: none; border: none; padding: 0; font-family: inherit;
-        color: var(--sf-brand); font-weight: 700; font-size: 12px; cursor: pointer;
-      }
-      .tl-toggle:hover { text-decoration: underline; }
-      .tl-expand { margin-top: 10px; }
-
       /* the NOW node holds the control — set it apart */
       .tl-node--now .tl-content {
         background: #eef4fb; border: 1.5px solid #b6d8f7; border-radius: 10px;
         padding: 12px 14px 16px; margin-top: 1px;
       }
       .tl-node--now .tl-title { color: #014486; font-size: 14.5px; letter-spacing: 0.01em; }
-      .tl-node--now .cc-title-row { margin: 10px 0 8px; }
+      .tl-node--now .cc-title-row { margin: 14px 0 8px; }
+      .tl-node--now .cc-title-row:first-of-type { margin-top: 10px; }
       .tl-node--now .cc-section-title { margin: 0; font-size: 13px; }
+      .tl-step-num {
+        display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px;
+        border-radius: 50%; background: var(--sf-brand); color: #fff; font-size: 9.5px; font-weight: 800;
+        margin-right: 6px; flex: none;
+      }
 
       /* checkbox control for line rows (shape only lives here, per concept) */
       .ck-check {
@@ -66,7 +65,7 @@
     <script src="../../assets/shell.js"></script>
     <script>
       (function () {
-        const state = { scope: ASTRUS.newScope(), docsOpen: false, populated: [] };
+        const state = { scope: ASTRUS.newScope(), populated: [] };
         let CTX, MOUNT;
 
         function countChip() {
@@ -98,7 +97,7 @@
           );
         }
 
-        /* ---- node 1 & 2 — closed history, terse ------------------------- */
+        /* ---- node 1 — closed history, terse ----------------------------- */
         function nodeReceived() {
           const e = CTX.data.engine;
           return (
@@ -107,25 +106,13 @@
             '<div class="tl-meta">Extracted <em>' + CTX.esc(e.filesExt) + "</em> · Completed " + CTX.esc(e.completed) + "</div></div></div>"
           );
         }
-        function nodeReviewed() {
-          return (
-            '<div class="tl-node tl-node--done"><div class="tl-dot">✓</div>' +
-            '<div class="tl-content"><div class="tl-title">Underwriter reviewed</div>' +
-            '<div class="tl-meta"><em>' + CTX.esc(CTX.data.underwriter) + "</em> signed off</div></div></div>"
-          );
-        }
-
-        /* ---- node 3 — the amber trigger, expandable doc picker ---------- */
+        /* ---- node 2 — the amber trigger, terse (docs live in the NOW node) */
         function nodeAttachment() {
           const f = CTX.data.followup;
-          const open = state.docsOpen;
           return (
             '<div class="tl-node tl-node--attn"><div class="tl-dot">🔔</div>' +
-            '<div class="tl-content"><div class="tl-title">New attachment linked — nothing reprocessed</div>' +
-            '<div class="tl-meta"><em>' + CTX.esc(f.file) + "</em> · " + CTX.esc(f.when) + "</div>" +
-            '<button class="tl-toggle" data-toggledocs aria-expanded="' + open + '">' + (open ? "Hide document ▴" : "Review document ▾") + "</button>" +
-            (open ? '<div class="tl-expand">' + CTX.renderFiles(state.scope) + "</div>" : "") +
-            "</div></div>"
+            '<div class="tl-content"><div class="tl-title">New attachment linked — not reprocessed</div>' +
+            '<div class="tl-meta"><em>' + CTX.esc(f.file) + "</em> · " + CTX.esc(f.when) + "</div></div></div>"
           );
         }
 
@@ -141,25 +128,29 @@
             .join("");
         }
 
-        /* ---- node 4 — NOW, holds the control, always last --------------- */
+        /* ---- node 3 — NOW, holds the control, always last: docs, then lines */
         function nodeNow() {
           const rows = CTX.data.lines.map(lineRow).join("");
           const hasSel = CTX.hasSelection(state.scope);
           return (
             '<div class="tl-node tl-node--now"><div class="tl-dot tl-dot--now">●</div>' +
             '<div class="tl-content"><div class="tl-title">NOW — you decide</div>' +
+
+            '<div class="cc-title-row"><p class="cc-section-title"><span class="tl-step-num">1</span>Which documents?</p></div>' +
+            CTX.renderFiles(state.scope) +
+
+            '<div class="cc-title-row"><p class="cc-section-title"><span class="tl-step-num">2</span>Which lines?</p>' + countChip() + "</div>" +
             '<div class="cc-mode">' +
             '<div class="cc-mode-opt' + (!state.scope.whole ? " on" : "") + '" data-mode="selected"><span class="cc-mode-radio"></span><div class="cc-mode-title">Only chosen lines</div></div>' +
             '<div class="cc-mode-opt' + (state.scope.whole ? " on" : "") + '" data-mode="whole"><span class="cc-mode-radio"></span><div class="cc-mode-title">Entire submission (' + CTX.data.lines.length + ")</div></div>" +
             "</div>" +
-            '<div class="cc-title-row">' +
-            '<p class="cc-section-title">Choose lines</p>' + countChip() +
-            "</div>" +
             '<div class="line-list">' + rows + "</div>" +
             runSummaryHTML() +
+
             '<div class="cc-actions">' +
-            '<button class="slds-btn slds-btn--brand" data-reprocess' + (!hasSel ? " disabled" : "") + ">Reprocess</button>" +
             '<button class="slds-btn" data-processnew>Process as New</button>' +
+            '<span class="spacer"></span>' +
+            '<button class="slds-btn slds-btn--brand" data-reprocess' + (!hasSel ? " disabled" : "") + ">Reprocess</button>" +
             "</div></div></div>"
           );
         }
@@ -168,14 +159,12 @@
           MOUNT.innerHTML = "";
           const rail = document.createElement("div");
           rail.className = "tl-rail";
-          rail.innerHTML = nodeReceived() + nodeReviewed() + nodeAttachment() + nodesPopulated() + nodeNow();
+          rail.innerHTML = nodeReceived() + nodeAttachment() + nodesPopulated() + nodeNow();
           MOUNT.appendChild(rail);
           bind(rail);
         }
 
         function bind(rail) {
-          const td = rail.querySelector("[data-toggledocs]");
-          if (td) td.onclick = () => { state.docsOpen = !state.docsOpen; render(); };
           rail.querySelectorAll(".doc-toggle").forEach((b) => (b.onclick = () => {
             const n = b.dataset.doc;
             state.scope.excludedDocs.has(n) ? state.scope.excludedDocs.delete(n) : state.scope.excludedDocs.add(n);
@@ -194,7 +183,6 @@
             if (ok) {
               state.populated.push({ labels: pop.map((l) => l.label).join(", "), when: "Just now" });
               state.scope = ASTRUS.newScope();
-              state.docsOpen = false;
               render();
             }
           };

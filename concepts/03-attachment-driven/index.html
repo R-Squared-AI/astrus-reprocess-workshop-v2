@@ -25,9 +25,10 @@
       .ad-hero-when { font-size: 10.5px; color: #b98a3a; margin-top: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
 
       .ad-question { font-size: 14.5px; font-weight: 800; margin: 2px 0 10px; color: var(--sf-text); }
+      .ad-section + .ad-section { margin-top: 18px; }
 
       /* quick "entire submission" pick */
-      .ad-quick { margin-bottom: 12px; }
+      .ad-quick { margin-bottom: 10px; }
       .ad-quick-btn {
         width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
         padding: 12px 14px; border-radius: 10px; border: 2px solid var(--sf-border-strong); background: #fff;
@@ -44,23 +45,11 @@
       .ad-quick-sub { font-weight: 600; font-size: 11px; color: var(--sf-text-weaker); margin-top: 1px; }
       .ad-quick-btn.on .ad-quick-sub { color: #1a7a3a; }
 
-      .ad-lines-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--sf-text-weaker); font-weight: 700; }
-
-      /* documents — secondary, collapsible */
-      .ad-docs-toggle {
-        width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
-        padding: 10px 12px; margin-top: 14px; border: 1px solid var(--sf-border); border-radius: var(--sf-radius);
-        background: #fafbfc; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--sf-text-weak);
-        transition: border-color .12s ease;
-      }
-      .ad-docs-toggle:hover { border-color: var(--sf-brand-accent); }
-      .ad-docs-toggle .ic { color: var(--sf-brand); margin-right: 2px; }
-      .ad-docs-caret { color: var(--sf-text-weaker); font-weight: 700; font-size: 11px; }
-      .ad-docs-panel { margin-top: 8px; }
+      /* documents — front and center, always expanded */
       .ad-old-hint { font-size: 11px; color: var(--sf-text-weaker); padding: 8px 12px; line-height: 1.5; background: #fafbfc; border: 1px solid var(--sf-border); border-top: none; border-radius: 0 0 var(--sf-radius) var(--sf-radius); margin: -1px 0 0; }
 
       .ad-actions-hint { font-size: 11px; color: var(--sf-text-weaker); margin: 8px 0 0; line-height: 1.5; }
-      .ad-reprocess-btn { flex: 1; font-size: 14px; padding: 10px 18px; font-weight: 700; }
+      .ad-reprocess-btn { font-size: 14px; padding: 10px 20px; font-weight: 700; }
     </style>
   </head>
   <body>
@@ -68,7 +57,7 @@
     <script src="../../assets/shell.js"></script>
     <script>
       (function () {
-        const state = { scope: ASTRUS.newScope(), docsOpen: false };
+        const state = { scope: ASTRUS.newScope() };
         let CTX;
 
         function statusStrip() {
@@ -122,21 +111,15 @@
           );
         }
 
-        function docsToggleHTML() {
-          const inCount = CTX.includedDocs(state.scope).length;
-          const total = CTX.data.files.length;
-          const open = state.docsOpen;
-          let html =
-            '<button class="ad-docs-toggle" data-docs-toggle type="button">' +
-            '<span><span class="ic">📄</span>' + inCount + " of " + total + " documents included</span>" +
-            '<span class="ad-docs-caret">' + (open ? "▲ Hide" : "▼ Review") + "</span></button>";
-          if (open) {
-            html += '<div class="ad-docs-panel">' + CTX.renderFiles(state.scope) + "</div>";
-            const superseded = CTX.data.files.find((f) => !f.isNew && /vehicle/i.test(f.name));
-            if (superseded && !state.scope.excludedDocs.has(superseded.name)) {
-              html += '<p class="ad-old-hint">Tip: ' + CTX.esc(superseded.name) + " looks superseded by the new revision — flip its switch off to exclude it.</p>";
-            }
+        function docsSectionHTML() {
+          let html = '<div class="ad-section">' +
+            '<p class="ad-question">Which documents should Astrus read?</p>' +
+            CTX.renderFiles(state.scope);
+          const superseded = CTX.data.files.find((f) => !f.isNew && /vehicle/i.test(f.name));
+          if (superseded && !state.scope.excludedDocs.has(superseded.name)) {
+            html += '<p class="ad-old-hint">Tip: ' + CTX.esc(superseded.name) + " looks superseded by the new revision — flip its switch off to exclude it.</p>";
           }
+          html += "</div>";
           return html;
         }
 
@@ -154,15 +137,17 @@
           mount.innerHTML =
             statusStrip() +
             heroHTML() +
-            '<p class="ad-question">What should Astrus populate from the documents?</p>' +
+            docsSectionHTML() +
+            '<div class="ad-section">' +
+            '<div class="cc-title-row"><p class="ad-question" style="margin:0">What should Astrus populate?</p>' + countChip() + "</div>" +
             quickHTML() +
-            '<div class="cc-title-row"><span class="ad-lines-label">Lines</span>' + countChip() + "</div>" +
             '<div class="line-list">' + rows + "</div>" +
-            docsToggleHTML() +
+            "</div>" +
             runSummaryHTML() +
             '<div class="cc-actions">' +
-            '<button class="slds-btn slds-btn--brand ad-reprocess-btn" data-reprocess ' + (!CTX.hasSelection(state.scope) ? "disabled" : "") + ">Reprocess</button>" +
-            '<button class="slds-btn" data-processnew>Process as New</button></div>' +
+            '<button class="slds-btn" data-processnew>Process as New</button>' +
+            '<span class="spacer"></span>' +
+            '<button class="slds-btn slds-btn--brand ad-reprocess-btn" data-reprocess ' + (!CTX.hasSelection(state.scope) ? "disabled" : "") + ">Reprocess</button></div>" +
             '<p class="ad-actions-hint">' + CTX.esc(CTX.data.protectedField) + " is always protected.</p>";
           bind(mount);
         }
@@ -171,11 +156,9 @@
           const wholeBtn = mount.querySelector("[data-whole]");
           if (wholeBtn) wholeBtn.onclick = () => { state.scope.whole = !state.scope.whole; render(); };
           mount.querySelectorAll("[data-line]").forEach((b) => (b.onclick = () => { const id = b.dataset.line; state.scope.lob.has(id) ? state.scope.lob.delete(id) : state.scope.lob.add(id); render(); }));
-          const docsToggle = mount.querySelector("[data-docs-toggle]");
-          if (docsToggle) docsToggle.onclick = () => { state.docsOpen = !state.docsOpen; render(); };
           mount.querySelectorAll(".doc-toggle").forEach((b) => (b.onclick = () => { const n = b.dataset.doc; state.scope.excludedDocs.has(n) ? state.scope.excludedDocs.delete(n) : state.scope.excludedDocs.add(n); render(); }));
           const rp = mount.querySelector("[data-reprocess]");
-          if (rp) rp.onclick = async () => { const ok = await CTX.runReprocess(state.scope); if (ok) { state.scope = ASTRUS.newScope(); state.docsOpen = false; render(); } };
+          if (rp) rp.onclick = async () => { const ok = await CTX.runReprocess(state.scope); if (ok) { state.scope = ASTRUS.newScope(); render(); } };
           const pn = mount.querySelector("[data-processnew]");
           if (pn) pn.onclick = async () => { const ok = await CTX.confirmModal({ title: "Process as a new submission?", body: "<p>Ignores your scope and rebuilds everything as a fresh submission.</p>", confirmLabel: "Process as New", destructive: true }); if (ok) CTX.toast("success", "Process as New started", "A new submission was sent to the engine."); };
         }
