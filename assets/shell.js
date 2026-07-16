@@ -471,6 +471,19 @@
       '<div class="side-empty">No upcoming activities.</div></div></section>'
     );
   }
+  /* ---- reviewer focus annotation (red box lives in CSS on #cc) --------- */
+  function focusCalloutHTML() {
+    return (
+      '<div class="focus-callout" role="note" aria-label="Reviewer focus note">' +
+      '<div class="focus-callout-box">This is the part to focus on that we have made changes to (click the button or something).</div>' +
+      '<svg class="focus-arrow" viewBox="0 0 96 96" fill="none" aria-hidden="true">' +
+      '<defs><marker id="focusArrowHead" markerWidth="7" markerHeight="7" refX="5" refY="3.2" orient="auto">' +
+      '<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#e11d1d"></path></marker></defs>' +
+      '<path d="M4,10 C46,6 60,52 90,80" stroke="#e11d1d" stroke-width="5" stroke-linecap="round" marker-end="url(#focusArrowHead)"></path>' +
+      "</svg></div>"
+    );
+  }
+
   function chromeHTML(conceptName) {
     const d = data;
     return (
@@ -521,7 +534,9 @@
       '<div class="sf-field"><div class="lbl">Last Modified By</div><div class="val"><a>Automated Process</a>, 7/13/2026 4:22 PM</div></div>' +
       '</div><p class="static-note">Details, System Information and the record header are a static mock of the live Salesforce page.</p></div></section>' +
       "</div>" +
-      '<div class="sf-col-right"><section class="cc" id="cc"><div class="cc-head">' +
+      '<div class="sf-col-right">' +
+      focusCalloutHTML() +
+      '<section class="cc is-focus" id="cc"><div class="cc-head">' +
       '<div class="cc-head-title"><span class="cc-bolt">⚡</span> Submissions AI Engine Status</div>' +
       '<span class="cc-badge-mount"></span></div>' +
       statusStripHTML() +
