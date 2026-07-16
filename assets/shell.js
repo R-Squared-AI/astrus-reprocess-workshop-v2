@@ -475,7 +475,7 @@
   function focusCalloutHTML() {
     return (
       '<div class="focus-callout" role="note" aria-label="Reviewer focus note">' +
-      '<div class="focus-callout-box">This is the part to focus on that we have made changes to (click the button or something).</div>' +
+      '<div class="focus-callout-box">This is the part to focus on — the red-highlighted card is what we changed.</div>' +
       '<svg class="focus-arrow" viewBox="0 0 96 96" fill="none" aria-hidden="true">' +
       '<defs><marker id="focusArrowHead" markerWidth="7" markerHeight="7" refX="5" refY="3.2" orient="auto">' +
       '<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#e11d1d"></path></marker></defs>' +
@@ -556,7 +556,148 @@
       '<p class="cc-gate-foot">Opens the guided reprocess panel. No line is touched until you review the files, choose the scope, and confirm.</p>' +
       "</div>";
     const b = mount.querySelector("#cc-open");
-    if (b) b.onclick = onOpen;
+    const clearBtnCallout = placeButtonCallout(b);
+    if (b) b.onclick = function () { if (clearBtnCallout) clearBtnCallout(); onOpen(); };
+  }
+
+  /* ---- "Click this button" pointer, anchored to the live gate button ---- */
+  /* Lives only on the entry view; it clears itself the moment the button is
+     clicked (the button is gone once you're inside the flow). */
+  function placeButtonCallout(btn) {
+    const col = document.querySelector(".sf-col-right");
+    if (!col || !btn) return null;
+    const old = col.querySelector(".btn-callout");
+    if (old) old.remove();
+    const wrap = document.createElement("div");
+    wrap.className = "btn-callout";
+    wrap.setAttribute("aria-hidden", "true");
+    wrap.innerHTML =
+      '<div class="btn-callout-box">Click this button</div>' +
+      '<svg class="btn-callout-arrow" width="76" height="44" viewBox="0 0 76 44" fill="none">' +
+      '<defs><marker id="btnArrowHead" markerWidth="7" markerHeight="7" refX="5" refY="3.2" orient="auto">' +
+      '<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#e11d1d"></path></marker></defs>' +
+      '<path d="M4,22 C34,22 44,22 68,22" stroke="#e11d1d" stroke-width="5" stroke-linecap="round" marker-end="url(#btnArrowHead)"></path>' +
+      "</svg>";
+    col.appendChild(wrap);
+    const BOX_W = 150, GAP = 76;
+    function reposition() {
+      if (!window.matchMedia("(min-width: 941px)").matches) { wrap.style.display = "none"; return; }
+      wrap.style.display = "";
+      const cr = col.getBoundingClientRect();
+      const br = btn.getBoundingClientRect();
+      wrap.style.width = BOX_W + "px";
+      wrap.style.left = br.left - cr.left - BOX_W - GAP + "px";
+      wrap.style.top = br.top - cr.top + br.height / 2 - 22 + "px";
+      const arrow = wrap.querySelector(".btn-callout-arrow");
+      arrow.style.left = BOX_W + "px";
+    }
+    reposition();
+    window.addEventListener("resize", reposition);
+    return function clear() {
+      window.removeEventListener("resize", reposition);
+      wrap.remove();
+    };
+  }
+
+  /* ---- guided tour: a red note per step, anchored to the live region ----
+     Watches #cc-body, reads which step is current from the stepper, and points
+     a red callout at that step's area. The notes are just "there" on whatever
+     step is showing — no sequential reveal. */
+  function initGuidedTour() {
+    const col = document.querySelector(".sf-col-right");
+    const card = document.getElementById("cc");
+    const body = document.getElementById("cc-body");
+    if (!col || !card || !body) return;
+
+    const STEPS = {
+      Upload: {
+        sel: ["#up-zone"],
+        html:
+          "<strong>Step 1 · Upload.</strong> Here’s where underwriters add the extra attachments the broker sent. Go ahead and add one with “add sample files” — it’s a mock, nothing really uploads."
+      },
+      Review: {
+        sel: [".docs-note", ".docs-block"],
+        html:
+          "<strong>Step 2 · Review.</strong> You’ll see the attachment you just added next to the files already processed with the original submission. The note here explains it — turn a file off only if it’s a newer version or an exact duplicate."
+      },
+      Scope: {
+        sel: [".cc-mode", ".line-list"],
+        html:
+          "<strong>Step 3 · Scope (the checklist).</strong> Choose which lines of business or sections to reprocess — pick only what you want updated so you don’t overwrite the values you already entered by hand."
+      },
+      Reprocess: {
+        sel: [".run-summary"],
+        html:
+          "<strong>Step 4 · Reprocess.</strong> Review the summary and run it. Locked lines stay untouched and the protected premium field is never overwritten."
+      }
+    };
+
+    function currentLabel() {
+      const el = body.querySelector(".cc-step.is-current .cc-step-label");
+      return el ? el.textContent.trim() : null;
+    }
+    function firstMatch(sels) {
+      for (let i = 0; i < sels.length; i++) {
+        const e = body.querySelector(sels[i]);
+        if (e) return e;
+      }
+      return null;
+    }
+    function ensureNote() {
+      let n = col.querySelector(".tour-note");
+      if (!n) {
+        n = document.createElement("div");
+        n.className = "tour-note";
+        n.setAttribute("aria-hidden", "true");
+        n.innerHTML =
+          '<div class="tour-note-box"></div>' +
+          '<svg class="tour-note-arrow" width="64" height="40" viewBox="0 0 64 40" fill="none">' +
+          '<defs><marker id="tourArrowHead" markerWidth="7" markerHeight="7" refX="5" refY="3.2" orient="auto">' +
+          '<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#e11d1d"></path></marker></defs>' +
+          '<path d="M4,20 C26,20 34,20 56,20" stroke="#e11d1d" stroke-width="5" stroke-linecap="round" marker-end="url(#tourArrowHead)"></path>' +
+          "</svg>";
+        col.appendChild(n);
+      }
+      return n;
+    }
+    function update() {
+      const label = currentLabel();
+      const step = label && STEPS[label];
+      const existing = col.querySelector(".tour-note");
+      if (!step || !window.matchMedia("(min-width: 941px)").matches) {
+        if (existing) existing.style.display = "none";
+        return;
+      }
+      const anchor = firstMatch(step.sel);
+      if (!anchor) {
+        if (existing) existing.style.display = "none";
+        return;
+      }
+      const note = ensureNote();
+      note.style.display = "";
+      note.querySelector(".tour-note-box").innerHTML = step.html;
+      const BOX_W = 250, GAP = 64;
+      const cr = col.getBoundingClientRect();
+      const kr = card.getBoundingClientRect();
+      const ar = anchor.getBoundingClientRect();
+      note.style.width = BOX_W + "px";
+      note.style.left = kr.left - cr.left - BOX_W - GAP + "px";
+      const bh = note.querySelector(".tour-note-box").offsetHeight || 80;
+      let centerY = ar.top + ar.height / 2 - cr.top;
+      const minY = kr.top - cr.top + bh / 2;
+      const maxY = kr.bottom - cr.top - bh / 2;
+      centerY = Math.max(minY, Math.min(maxY, centerY));
+      note.style.top = centerY - bh / 2 + "px";
+      note.querySelector(".tour-note-arrow").style.left = BOX_W + "px";
+    }
+    let raf = 0;
+    function schedule() {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(update);
+    }
+    new MutationObserver(schedule).observe(body, { childList: true, subtree: true });
+    window.addEventListener("resize", schedule);
+    schedule();
   }
 
   function boot(concept) {
@@ -607,6 +748,7 @@
     // Deep-link straight into the panel with ?open=1 (skips the entry gate).
     if (/[?&]open=1/.test(location.search)) openFlow();
     else renderGate(mount, openFlow);
+    initGuidedTour();
     document.title = "Astrus Reprocess · " + conceptName;
   }
 

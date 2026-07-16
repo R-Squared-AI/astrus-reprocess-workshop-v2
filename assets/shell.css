@@ -613,6 +613,58 @@ body {
   overflow: visible;
   pointer-events: none;
 }
+/* "Click this button" pointer on the entry view (JS-anchored to the button) */
+.btn-callout {
+  position: absolute;
+  z-index: 61;
+  pointer-events: none;
+}
+.btn-callout-box {
+  background: #e11d1d;
+  color: #fff;
+  font-family: var(--sf-font);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(225, 29, 29, 0.4);
+}
+.btn-callout-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  overflow: visible;
+}
+
+/* Per-step guided-tour notes (JS-anchored to the current step's region) */
+.tour-note {
+  position: absolute;
+  z-index: 59;
+  pointer-events: none;
+}
+.tour-note-box {
+  background: #e11d1d;
+  color: #fff;
+  font-family: var(--sf-font);
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.46;
+  padding: 12px 15px;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(225, 29, 29, 0.4);
+}
+.tour-note-box strong {
+  font-weight: 800;
+}
+.tour-note-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  overflow: visible;
+}
+
 /* Stacked (narrow) layout: drop the note above the card, no side room. */
 @media (max-width: 940px) {
   .focus-callout {
@@ -626,5 +678,9 @@ body {
   #cc.is-focus {
     outline-offset: 3px;
     box-shadow: 0 0 0 6px rgba(225, 29, 29, 0.12), var(--sf-shadow-card);
+  }
+  .btn-callout,
+  .tour-note {
+    display: none !important;
   }
 }
