@@ -660,9 +660,35 @@ body {
 }
 .tour-note-arrow {
   position: absolute;
-  top: 50%;
   transform: translateY(-50%);
   overflow: visible;
+}
+
+/* Persistent "back to all options" button on every concept page */
+.wk-back {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 200;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #032d60;
+  color: #fff;
+  font-family: var(--sf-font);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  text-decoration: none;
+  box-shadow: 0 8px 22px rgba(3, 45, 96, 0.38);
+}
+.wk-back:hover {
+  background: #0b3f7a;
+}
+.wk-back:focus-visible {
+  outline: 2px solid var(--sf-brand-accent);
+  outline-offset: 2px;
 }
 
 /* Stacked (narrow) layout: drop the note above the card, no side room. */

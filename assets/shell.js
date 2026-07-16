@@ -487,6 +487,7 @@
   function chromeHTML(conceptName) {
     const d = data;
     return (
+      '<a class="wk-back" href="../../index.html" aria-label="Back to all options">← All options</a>' +
       '<div class="proto-ribbon"><span>Astrus prototype</span><span class="dot">•</span>' +
       "<span><strong>" + esc(conceptName) + " · Reprocess</strong></span><span class=\"dot\">•</span>" +
       '<a href="../../index.html">← All options</a><span class="dot">•</span>' +
@@ -616,9 +617,9 @@
           "<strong>Step 1 · Upload.</strong> Here’s where underwriters add the extra attachments the broker sent. Go ahead and add one with “add sample files” — it’s a mock, nothing really uploads."
       },
       Review: {
-        sel: [".docs-note", ".docs-block"],
+        sel: [".docs-block", ".docs-note"],
         html:
-          "<strong>Step 2 · Review.</strong> You’ll see the attachment you just added next to the files already processed with the original submission. The note here explains it — turn a file off only if it’s a newer version or an exact duplicate."
+          "<strong>Step 2 · Review.</strong> You’ll see the attachment you just added next to the files already processed with the original submission. Turn a file off only if it’s a newer version or an exact duplicate — the note above explains it."
       },
       Scope: {
         sel: [".cc-mode", ".line-list"],
@@ -683,12 +684,16 @@
       note.style.width = BOX_W + "px";
       note.style.left = kr.left - cr.left - BOX_W - GAP + "px";
       const bh = note.querySelector(".tour-note-box").offsetHeight || 80;
-      let centerY = ar.top + ar.height / 2 - cr.top;
-      const minY = kr.top - cr.top + bh / 2;
-      const maxY = kr.bottom - cr.top - bh / 2;
-      centerY = Math.max(minY, Math.min(maxY, centerY));
-      note.style.top = centerY - bh / 2 + "px";
-      note.querySelector(".tour-note-arrow").style.left = BOX_W + "px";
+      // Target = the anchor's vertical centre (in column coords).
+      const targetY = ar.top + ar.height / 2 - cr.top;
+      // Place the box centred on the target, but keep it inside the card.
+      let boxTop = targetY - bh / 2;
+      boxTop = Math.max(kr.top - cr.top + 6, Math.min(kr.bottom - cr.top - bh - 6, boxTop));
+      note.style.top = boxTop + "px";
+      // Arrow points exactly at the target regardless of where the box landed.
+      const arrow = note.querySelector(".tour-note-arrow");
+      arrow.style.left = BOX_W + "px";
+      arrow.style.top = targetY - boxTop + "px";
     }
     let raf = 0;
     function schedule() {
