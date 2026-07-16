@@ -618,12 +618,6 @@
       "<strong>Step 4 · Reprocess.</strong> Review the summary and run it. Locked lines stay untouched and the protected premium field is never overwritten."
     ];
 
-    const SEQ = [
-      ["#up-zone"],
-      [".docs-block", ".docs-note"],
-      [".cc-mode", ".line-list"],
-      [".run-summary"]
-    ];
     function firstMatch(sels) {
       for (let i = 0; i < sels.length; i++) {
         const e = body.querySelector(sels[i]);
@@ -632,18 +626,36 @@
       return null;
     }
     function resolveItems() {
-      // Guided Rail: all four at once, each pinned to its numbered dot (1–4).
+      // Guided Rail: all four at once; arrow stops just LEFT of each numbered
+      // dot so it points at the number without covering it.
       if (body.querySelector(".gr-rail")) {
         return Array.prototype.slice
           .call(body.querySelectorAll(".gr-node .gr-dot"))
           .filter((d) => /^[1-4]$/.test((d.textContent || "").trim()))
           .slice(0, 4)
-          .map((d, i) => ({ html: HTML[i], el: d, dot: true }));
+          .map((d, i) => ({ html: HTML[i], el: d, kind: "dot" }));
       }
-      // Sequential concepts: one note on the step that's rendered right now.
-      for (let i = 0; i < SEQ.length; i++) {
-        const el = firstMatch(SEQ[i]);
-        if (el) return [{ html: HTML[i], el: el, dot: false }];
+      // Timeline: one note on the active node; point at its title, not content.
+      if (body.querySelector(".tl-rail")) {
+        const active = body.querySelector(".tl-node--active");
+        if (!active) return [];
+        const btn = active.querySelector("[data-node]");
+        const idx = btn ? Number(btn.dataset.node) : 0;
+        const head = active.querySelector(".tl-head-title") || active.querySelector(".tl-head") || active;
+        return [{ html: HTML[idx], el: head, kind: "header" }];
+      }
+      // Checklist: one note on the current step; point at its SECTION HEADER
+      // (the "Review attachments" / "Choose what to reprocess" title) — never at
+      // a document toggle inside the list, which would read as "turn this off".
+      const STEP_REGION = [["#up-zone"], [".docs-block", ".docs-note"], [".cc-mode", ".line-list"], [".run-summary"]];
+      for (let i = 0; i < STEP_REGION.length; i++) {
+        if (firstMatch(STEP_REGION[i])) {
+          const head =
+            body.querySelector(".docs-head") ||
+            body.querySelector(".cc-section-title") ||
+            firstMatch(STEP_REGION[i]);
+          return [{ html: HTML[i], el: head, kind: "header" }];
+        }
       }
       return [];
     }
@@ -698,8 +710,9 @@
           return {
             note: note,
             bh: note.firstChild.offsetHeight || 80,
-            // aim near the target's top-left so tall regions point at their heading
-            tx: ar.left - cr.left + (it.dot ? ar.width / 2 : Math.min(16, ar.width * 0.15)),
+            // Dots: stop ~8px LEFT of the dot so the number stays visible.
+            // Headers: land at the title's left edge, not inside the content.
+            tx: ar.left - cr.left + (it.kind === "dot" ? -8 : 4),
             ty: ar.top + ar.height / 2 - cr.top
           };
         })
