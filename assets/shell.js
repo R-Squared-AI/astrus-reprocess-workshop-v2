@@ -270,7 +270,7 @@
   const REVIEW_NOTE =
     "The engine reads the <strong>whole set</strong> at once and cross-checks fields across every document — and it can’t tell which file is newest. " +
     "Turn a document off <strong>only</strong> if you’ve uploaded a newer version of it, or it’s an exact duplicate (check the <strong>date received</strong>). " +
-    "Leaving an old file on, or dropping one that’s still needed, produces wrong results. Just changing a field or two? Edit it by hand instead of reprocessing.";
+    "Leaving an old file on, or dropping one that’s still needed, produces wrong results.";
   function renderReview(scope, opts) {
     opts = opts || {};
     const already = alreadyProcessed();
