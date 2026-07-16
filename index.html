@@ -3,6 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Underwriter-Controlled Reprocessing</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -43,8 +46,11 @@
         ["Option 2", "02-timeline"],
         ["Option 3", "03-guided-rail"]
       ];
+      // Cache-buster: a fresh token every visit means clicking a concept always
+      // loads the latest HTML + assets, never a stale browser copy.
+      var CB = Date.now().toString(36);
       document.getElementById("grid").innerHTML = C.map(function (c) {
-        return '<a class="card" href="concepts/' + c[1] + '/index.html?mode=additional">' + c[0] + "</a>";
+        return '<a class="card" href="concepts/' + c[1] + '/index.html?mode=additional&cb=' + CB + '">' + c[0] + "</a>";
       }).join("");
     </script>
   </body>
